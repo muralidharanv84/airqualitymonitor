@@ -1,0 +1,12 @@
+{
+  "folders": [
+    { "name": "repo", "path": "." },
+    { "name": "device", "path": "device" }
+  ],
+  "settings": {
+    "python.analysis.extraPaths": [
+      "${workspaceFolder:device}",
+      "${workspaceFolder:device}/lib"
+    ]
+  }
+}
