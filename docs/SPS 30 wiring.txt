@@ -1,0 +1,8 @@
+For UART this is how its wired:
+
+SPS30 -> TinyS3
+Black: Pin 1 (VDD)  ->  5V
+Red: Pin 2 (RX) ->      TX
+White: Pin 3 (TX) ->    RX
+Yellow: Pin 4 (SEL) ->  Not connected / floating
+Orange: Pin 5 (GND) ->  GND
