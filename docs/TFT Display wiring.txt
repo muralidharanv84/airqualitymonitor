@@ -1,0 +1,10 @@
+Display             ->  TinyS3
+
+VCC (black)         ->  5V
+GND (white)         ->  GND
+CS  (grey)          ->  D5 (IO5)
+RESET (purple)      ->  D7 (IO7)
+DC (blue)           ->  D6 (IO6)
+SDI(MOSI) (green)   ->  D35 (IO35)
+SCK (yellow)        ->  D36 (IO36)
+LED (orange)        ->  3V3

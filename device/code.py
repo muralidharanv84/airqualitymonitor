@@ -6,9 +6,11 @@ import tinys3
 import sps30_uart
 import pixel_wheel
 import utils
+import display
 
 enable_pixel_wheel = True
-enable_sps30 = False
+enable_sps30 = True
+enable_display = True
 
 # Create a NeoPixel instance
 # Brightness of 0.3 is ample for the 1515 sized LED
@@ -38,6 +40,13 @@ if enable_pixel_wheel:
 if enable_sps30:
     sps30_uart.wake_up()
 
+if enable_display:
+    disp = display.init_display()
+    display.hello_world(disp)
+    time.sleep(2)
+    group, pm_lbl, aqi_lbl = display.make_pm_aqi_labels(scale=2)
+    disp.root_group = group
+
 # Rainbow colours on the NeoPixel
 while True:
 
@@ -48,6 +57,8 @@ while True:
         pm25 = sps30_uart.read_pm25()
         aqi_us = utils.aqi_us_from_pm25(pm25)
         print(f"PM2.5={pm25:.1f} AQI_US={aqi_us}")
+        if enable_display:
+            display.update_pm_aqi(pm_lbl, aqi_lbl, pm25, aqi_us)
 
     # Sleep for 150ms so the colour cycle isn't too fast
     time.sleep(1)
