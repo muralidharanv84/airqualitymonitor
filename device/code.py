@@ -1,4 +1,4 @@
-import time, gc, os
+import time, gc
 import neopixel
 import board
 import tinys3
@@ -8,7 +8,6 @@ import pixel_wheel
 import utils
 import display
 import networking
-
 
 enable_pixel_wheel = True
 enable_sps30 = True
@@ -31,7 +30,7 @@ if enable_sps30:
     sps30_uart.wake_up()
 
 disp = None
-pm_lbl = aqi_lbl = None
+pm_lbl = aqi_lbl = aqi_desc_label = None
 wifi_icon = None
 
 if enable_display:
@@ -42,16 +41,16 @@ if enable_display:
     group, pm_lbl, aqi_lbl, aqi_desc_label = display.make_pm_aqi_labels(scale=2)
     disp.root_group = group
 
-    # WiFi icon
     wifi_icon = display.add_wifi_icon_to_group(group, display_width=240, scale=1)
     wifi_icon.set_state(display.WifiIcon.INIT)
 
 # Network manager
-net = networking.NetworkManager(healthcheck_every_s=10.0, wifi_retry_s=5.0) if enable_wifi else None
+net = networking.NetworkManager(healthcheck_every_s=30.0, wifi_retry_s=5.0, debug=True) if enable_wifi else None
+last_net_state = None  # IMPORTANT: prevents blink timer from resetting every loop
 
 # Scheduling (monotonic timers)
 PM_EVERY_S = 5.0
-PIXEL_EVERY_S = 5.0  # adjust to taste
+PIXEL_EVERY_S = 5.0
 LOOP_SLEEP_S = 0.05
 
 next_pm = 0.0
@@ -68,14 +67,18 @@ while True:
     # --- WiFi state machine (non-blocking) ---
     if enable_wifi and net and enable_display and wifi_icon:
         st = net.tick(now)
-        if st == networking.NetState.INIT:
-            wifi_icon.set_state(display.WifiIcon.INIT)   # blinking
-        elif st == networking.NetState.ERROR:
-            wifi_icon.set_state(display.WifiIcon.ERROR)  # red + X
-        else:
-            wifi_icon.set_state(display.WifiIcon.OK)     # solid white
 
-    # --- NeoPixel rotation (scheduled like PM_EVERY_S) ---
+        # Only set state when it changes (otherwise blink never blinks)
+        if st != last_net_state:
+            if st == networking.NetState.INIT:
+                wifi_icon.set_state(display.WifiIcon.INIT)   # blinking
+            elif st == networking.NetState.ERROR:
+                wifi_icon.set_state(display.WifiIcon.ERROR)  # red + X
+            else:
+                wifi_icon.set_state(display.WifiIcon.OK)     # solid white
+            last_net_state = st
+
+    # --- NeoPixel rotation (scheduled) ---
     if enable_pixel_wheel and now >= next_pixel:
         next_pixel = now + PIXEL_EVERY_S
         color_index = pixel_wheel.change(pixel, color_index)
@@ -88,7 +91,7 @@ while True:
         aqi_us = utils.aqi_us_from_pm25(pm25)
         print(f"PM2.5={pm25:.1f} AQI_US={aqi_us}")
 
-        if enable_display and pm_lbl and aqi_lbl:
+        if enable_display and pm_lbl and aqi_lbl and aqi_desc_label:
             display.update_pm_aqi(pm_lbl, aqi_lbl, aqi_desc_label, pm25, aqi_us)
 
     time.sleep(LOOP_SLEEP_S)
