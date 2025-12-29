@@ -2,12 +2,14 @@ import time, gc
 import neopixel
 import board
 import tinys3
+import os
 
 import sps30_uart
 import pixel_wheel
 import utils
 import display
 import networking
+import telemetry
 
 enable_pixel_wheel = True
 enable_sps30 = True
@@ -48,6 +50,19 @@ if enable_display:
 net = networking.NetworkManager(healthcheck_every_s=30.0, wifi_retry_s=5.0, debug=True) if enable_wifi else None
 last_net_state = None  # IMPORTANT: prevents blink timer from resetting every loop
 
+# --- Telemetry setup ---
+API_INGEST_URL = os.getenv("API_INGEST_URL")
+if not API_INGEST_URL:
+    raise RuntimeError("Missing API_INGEST_URL in settings.toml")
+
+device_id, device_secret = telemetry.load_device_credentials()
+tm = telemetry.TelemetryManager(
+    ingest_url=API_INGEST_URL,
+    device_id=device_id,
+    device_secret=device_secret,
+    post_every_s=60.0,
+    stale_s=300.0
+)
 # Scheduling (monotonic timers)
 PM_EVERY_S = 5.0
 PIXEL_EVERY_S = 5.0
@@ -78,6 +93,10 @@ while True:
                 wifi_icon.set_state(display.WifiIcon.OK)     # solid white
             last_net_state = st
 
+        #Update telemetry
+        if st == networking.NetState.OK and net.requests:
+            tm.tick(net.requests, now=now)
+
     # --- NeoPixel rotation (scheduled) ---
     if enable_pixel_wheel and now >= next_pixel:
         next_pixel = now + PIXEL_EVERY_S
@@ -90,6 +109,9 @@ while True:
         pm25 = sps30_uart.read_pm25()
         aqi_us = utils.aqi_us_from_pm25(pm25)
         print(f"PM2.5={pm25:.1f} AQI_US={aqi_us}")
+        now = time.monotonic()
+        tm.update_metric("pm25_ugm3", float(pm25), ts=now)
+        tm.update_metric("aqi_us", int(aqi_us), ts=now)
 
         if enable_display and pm_lbl and aqi_lbl and aqi_desc_label:
             display.update_pm_aqi(pm_lbl, aqi_lbl, aqi_desc_label, pm25, aqi_us)
