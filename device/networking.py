@@ -1,10 +1,12 @@
 # networking.py
 import os
 import time
+import rtc
 import wifi
 import socketpool
 import ssl
 import adafruit_requests
+import adafruit_ntp
 
 
 class NetState:
@@ -20,6 +22,7 @@ class NetworkManager:
         self.debug = debug
 
         self.requests = None
+        self._socketpool = None
         self.health_ok = False
 
         self._next_wifi_attempt = 0.0
@@ -31,8 +34,13 @@ class NetworkManager:
             print(msg)
 
     def _get_session(self):
-        pool = socketpool.SocketPool(wifi.radio)
+        pool = self._get_socketpool()
         return adafruit_requests.Session(pool, ssl.create_default_context())
+
+    def _get_socketpool(self):
+        if self._socketpool is None:
+            self._socketpool = socketpool.SocketPool(wifi.radio)
+        return self._socketpool
 
     def _connect_wifi_once(self):
         ssid = os.getenv("CIRCUITPY_WIFI_SSID")
@@ -101,3 +109,37 @@ class NetworkManager:
             self.health_ok = self._healthcheck_ok()
 
         return NetState.OK if self.health_ok else NetState.INIT
+
+    def is_connected(self):
+        return wifi.radio.connected
+
+    def _utc_offset_hours(self, offset_str):
+        # offset_str is like "+05:30" or "-07:00" or "5.5"
+        if not offset_str:
+            return 0.0
+        if ":" in offset_str:
+            sign = -1 if offset_str[0] == "-" else 1
+            hours = int(offset_str[1:3])
+            minutes = int(offset_str[4:6])
+            return sign * (hours + minutes / 60.0)
+        return float(offset_str)
+
+    def _timezone_offset_hours(self):
+        offset = (
+            os.getenv("TIMEZONE_OFFSET")
+            or os.getenv("TIMEZONE_OFFSET_HOURS")
+            or os.getenv("UTC_OFFSET")
+        )
+        if offset is None:
+            return 5.5
+        return self._utc_offset_hours(offset)
+
+    def sync_time(self, timezone=None):
+        if not self.is_connected():
+            raise RuntimeError("WiFi not connected")
+
+        tz_offset = self._timezone_offset_hours()
+        self._log(f"Syncing time from NTP: time.google.com (tz_offset={tz_offset})")
+        ntp = adafruit_ntp.NTP(self._get_socketpool(), server="time.google.com", tz_offset=tz_offset)
+        rtc.RTC().datetime = ntp.datetime
+        return rtc.RTC().datetime

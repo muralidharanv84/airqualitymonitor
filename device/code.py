@@ -34,6 +34,7 @@ if enable_sps30:
 disp = None
 pm_lbl = aqi_lbl = aqi_desc_label = None
 wifi_icon = None
+time_label = None
 
 if enable_display:
     disp = display.init_display()
@@ -45,6 +46,7 @@ if enable_display:
 
     wifi_icon = display.add_wifi_icon_to_group(group, display_width=240, scale=1)
     wifi_icon.set_state(display.WifiIcon.INIT)
+    time_label = display.add_time_label_to_group(group, display_width=disp.width, display_height=disp.height, scale=1)
 
 # Network manager
 net = networking.NetworkManager(healthcheck_every_s=30.0, wifi_retry_s=5.0, debug=True) if enable_wifi else None
@@ -70,6 +72,9 @@ LOOP_SLEEP_S = 0.05
 
 next_pm = 0.0
 next_pixel = 0.0
+next_time = 0.0
+time_synced = False
+next_time_sync = 0.0
 
 # ---------- Main loop ----------
 while True:
@@ -97,6 +102,20 @@ while True:
         if st == networking.NetState.OK and net.requests:
             tm.tick(net.requests, now=now)
 
+        if net.is_connected() and not time_synced and now >= next_time_sync:
+            try:
+                net.sync_time()
+                time_synced = True
+                if enable_display and time_label:
+                    display.update_time_label(time_label)
+            except Exception as e:
+                print(f"Time sync failed: {e}")
+                next_time_sync = now + 30.0
+
+        if not net.is_connected():
+            time_synced = False
+            next_time_sync = 0.0
+
     # --- NeoPixel rotation (scheduled) ---
     if enable_pixel_wheel and now >= next_pixel:
         next_pixel = now + PIXEL_EVERY_S
@@ -115,5 +134,9 @@ while True:
 
         if enable_display and pm_lbl and aqi_lbl and aqi_desc_label:
             display.update_pm_aqi(pm_lbl, aqi_lbl, aqi_desc_label, pm25, aqi_us)
+
+    if enable_display and time_label and now >= next_time:
+        next_time = now + 1.0
+        display.update_time_label(time_label)
 
     time.sleep(LOOP_SLEEP_S)

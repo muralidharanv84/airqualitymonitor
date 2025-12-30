@@ -209,3 +209,27 @@ def add_wifi_icon_to_group(root_group, display_width=240, margin=4, scale=1):
     wifi = WifiIcon(x=x, y=y, scale=scale)
     root_group.append(wifi.group)
     return wifi
+
+
+_MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def add_time_label_to_group(root_group, display_width=240, display_height=320, margin=4, scale=1, color=0xFFFFFF):
+    time_label = label.Label(
+        terminalio.FONT,
+        text="--- -- --:--",
+        color=color,
+        scale=scale,
+    )
+    time_label.anchor_point = (1.0, 1.0)
+    time_label.anchored_position = (display_width - margin, display_height - margin)
+    root_group.append(time_label)
+    return time_label
+
+
+def update_time_label(time_label, now=None):
+    if now is None:
+        now = time.localtime()
+    month = _MONTHS[now.tm_mon - 1]
+    time_label.text = f"{month} {now.tm_mday:02d} {now.tm_hour:02d}:{now.tm_min:02d}"
