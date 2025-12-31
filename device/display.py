@@ -136,7 +136,9 @@ def update_pm_aqi(pm_label, aqi_label, aqi_desc_label, pm25, aqi):
     aqi_desc_label.color = color
 
 def _bitmap_from_str(rows):
-    bmp = displayio.Bitmap(16, 16, 2)  # 0 transparent, 1 ink
+    height = len(rows)
+    width = len(rows[0]) if rows else 0
+    bmp = displayio.Bitmap(width, height, 2)  # 0 transparent, 1 ink
     for y, row in enumerate(rows):
         for x, ch in enumerate(row):
             bmp[x, y] = 1 if ch == "1" else 0
@@ -211,6 +213,97 @@ def add_wifi_icon_to_group(root_group, display_width=240, margin=4, scale=1):
     return wifi
 
 
+def _make_battery_bitmap(fill_cols=0, charging=False):
+    width = 24
+    height = 12
+    bmp = displayio.Bitmap(width, height, 2)
+
+    # Outline
+    for x in range(0, 20):
+        bmp[x, 1] = 1
+        bmp[x, 10] = 1
+    for y in range(2, 10):
+        bmp[0, y] = 1
+        bmp[19, y] = 1
+
+    # Nub
+    for x in range(20, 23):
+        for y in range(4, 8):
+            bmp[x, y] = 1
+
+    # Fill
+    if fill_cols > 0:
+        max_cols = min(fill_cols, 18)
+        for x in range(1, 1 + max_cols):
+            for y in range(3, 9):
+                bmp[x, y] = 1
+
+    # Charging bolt
+    if charging:
+        bolt = [
+            "001100",
+            "011110",
+            "001100",
+            "011000",
+            "111100",
+            "001100",
+        ]
+        for y, row in enumerate(bolt):
+            for x, ch in enumerate(row):
+                if ch == "1":
+                    bmp[8 + x, 3 + y] = 1
+
+    return bmp
+
+
+class BatteryIcon:
+    EMPTY = 0
+    QUARTER = 1
+    HALF = 2
+    THREE_QUARTER = 3
+    FULL = 4
+    CHARGING = 5
+
+    def __init__(self, x, y, scale=1, color=0xFFFFFF):
+        self.group = displayio.Group(x=x, y=y, scale=scale)
+
+        self.pal = displayio.Palette(2)
+        self.pal[0] = 0x000000
+        self.pal.make_transparent(0)
+        self.pal[1] = color
+
+        self._bitmaps = {
+            BatteryIcon.EMPTY: _make_battery_bitmap(fill_cols=0),
+            BatteryIcon.QUARTER: _make_battery_bitmap(fill_cols=4),
+            BatteryIcon.HALF: _make_battery_bitmap(fill_cols=9),
+            BatteryIcon.THREE_QUARTER: _make_battery_bitmap(fill_cols=13),
+            BatteryIcon.FULL: _make_battery_bitmap(fill_cols=18),
+            BatteryIcon.CHARGING: _make_battery_bitmap(fill_cols=0, charging=True),
+        }
+
+        self.tg = displayio.TileGrid(self._bitmaps[BatteryIcon.EMPTY], pixel_shader=self.pal)
+        self.group.append(self.tg)
+        self.state = BatteryIcon.EMPTY
+
+    def set_state(self, state):
+        if state in self._bitmaps:
+            self.state = state
+            self.tg.bitmap = self._bitmaps[state]
+
+
+def add_battery_icon_to_group(
+    root_group, display_width=240, margin=4, scale=1, color=0xFFFFFF, x=None, y=None
+):
+    width = 24 * scale
+    if x is None:
+        x = display_width - width - margin
+    if y is None:
+        y = margin
+    battery = BatteryIcon(x=x, y=y, scale=scale, color=color)
+    root_group.append(battery.group)
+    return battery
+
+
 _MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun",
            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
 
@@ -233,3 +326,111 @@ def update_time_label(time_label, now=None):
         now = time.localtime()
     month = _MONTHS[now.tm_mon - 1]
     time_label.text = f"{month} {now.tm_mday:02d} {now.tm_hour:02d}:{now.tm_min:02d}"
+
+
+def _make_label(text, color, scale, anchor_point, anchored_position):
+    lbl = label.Label(
+        terminalio.FONT,
+        text=text,
+        color=color,
+        scale=scale,
+    )
+    lbl.anchor_point = anchor_point
+    lbl.anchored_position = anchored_position
+    return lbl
+
+
+def make_dashboard(display_width=240, display_height=320):
+    group = displayio.Group()
+
+    margin = 6
+    icon_gap = 6
+    wifi_w = 16
+    battery_w = 24
+    battery_x = display_width - margin - battery_w
+    wifi_x = battery_x - icon_gap - wifi_w
+    icon_y = margin
+
+    wifi_icon = WifiIcon(x=wifi_x, y=icon_y, scale=1)
+    group.append(wifi_icon.group)
+
+    battery_icon = BatteryIcon(x=battery_x, y=icon_y + 2, scale=1, color=0xFFFFFF)
+    group.append(battery_icon.group)
+
+    aqi_title = _make_label(
+        "AQI", 0xFFFFFF, 2, (0.5, 0.5), (display_width // 2, 44)
+    )
+    aqi_value = _make_label(
+        "--", 0xFFFFFF, 5, (0.5, 0.5), (display_width // 2, 92)
+    )
+    aqi_desc = _make_label(
+        " ", 0xFFFFFF, 2, (0.5, 0.5), (display_width // 2, 134)
+    )
+
+    col_x = (40, 120, 200)
+    row1_label_y = 176
+    row1_value_y = 200
+    row1_unit_y = 220
+    row2_label_y = 244
+    row2_value_y = 268
+
+    co2_label = _make_label("CO2", 0xFFFFFF, 1, (0.5, 0.5), (col_x[0], row1_label_y))
+    pm25_label = _make_label("PM2.5", 0xFFFFFF, 1, (0.5, 0.5), (col_x[1], row1_label_y))
+    tvoc_label = _make_label("TVOC", 0xFFFFFF, 1, (0.5, 0.5), (col_x[2], row1_label_y))
+
+    co2_value = _make_label(" ", 0xFFFFFF, 3, (0.5, 0.5), (col_x[0], row1_value_y))
+    pm25_value = _make_label("--", 0xFFFFFF, 3, (0.5, 0.5), (col_x[1], row1_value_y))
+    tvoc_value = _make_label(" ", 0xFFFFFF, 3, (0.5, 0.5), (col_x[2], row1_value_y))
+
+    co2_unit = _make_label("ppm", 0xFFFFFF, 1, (0.5, 0.5), (col_x[0], row1_unit_y))
+    pm25_unit = _make_label("ug / m3", 0xFFFFFF, 1, (0.5, 0.5), (col_x[1], row1_unit_y))
+    tvoc_unit = _make_label("ppm", 0xFFFFFF, 1, (0.5, 0.5), (col_x[2], row1_unit_y))
+
+    temp_label = _make_label("Temp", 0xFFFFFF, 1, (0.5, 0.5), (col_x[0], row2_label_y))
+    rh_label = _make_label("RH", 0xFFFFFF, 1, (0.5, 0.5), (col_x[1], row2_label_y))
+    tvoc_index_label = _make_label("VOC Ix", 0xFFFFFF, 1, (0.5, 0.5), (col_x[2], row2_label_y))
+
+    temp_value = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (col_x[0], row2_value_y))
+    rh_value = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (col_x[1], row2_value_y))
+    tvoc_index_value = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (col_x[2], row2_value_y))
+
+    for item in (
+        aqi_title, aqi_value, aqi_desc,
+        co2_label, pm25_label, tvoc_label,
+        co2_value, pm25_value, tvoc_value,
+        co2_unit, pm25_unit, tvoc_unit,
+        temp_label, rh_label, tvoc_index_label,
+        temp_value, rh_value, tvoc_index_value,
+    ):
+        group.append(item)
+
+    labels = {
+        "aqi_title": aqi_title,
+        "aqi_value": aqi_value,
+        "aqi_desc": aqi_desc,
+        "pm25_label": pm25_label,
+        "pm25_value": pm25_value,
+        "pm25_unit": pm25_unit,
+        "co2_value": co2_value,
+        "tvoc_value": tvoc_value,
+        "temp_value": temp_value,
+        "rh_value": rh_value,
+        "tvoc_index_value": tvoc_index_value,
+    }
+
+    return group, labels, wifi_icon, battery_icon
+
+
+def update_dashboard(labels, pm25, aqi):
+    color, desc = utils.get_classification_from_aqi(int(aqi))
+
+    labels["aqi_title"].color = color
+    labels["aqi_value"].text = f"{int(aqi)}"
+    labels["aqi_value"].color = color
+    labels["aqi_desc"].text = desc
+    labels["aqi_desc"].color = color
+
+    labels["pm25_label"].color = color
+    labels["pm25_value"].text = f"{pm25:.0f}"
+    labels["pm25_value"].color = color
+    labels["pm25_unit"].color = color

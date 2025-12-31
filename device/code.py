@@ -32,21 +32,23 @@ if enable_sps30:
     sps30_uart.wake_up()
 
 disp = None
-pm_lbl = aqi_lbl = aqi_desc_label = None
+dashboard_labels = None
 wifi_icon = None
+battery_icon = None
 time_label = None
 
 if enable_display:
     disp = display.init_display()
-    display.hello_world(disp)
-    time.sleep(2)
-
-    group, pm_lbl, aqi_lbl, aqi_desc_label = display.make_pm_aqi_labels(scale=2)
+    group, dashboard_labels, wifi_icon, battery_icon = display.make_dashboard(
+        display_width=disp.width, display_height=disp.height
+    )
     disp.root_group = group
 
-    wifi_icon = display.add_wifi_icon_to_group(group, display_width=240, scale=1)
     wifi_icon.set_state(display.WifiIcon.INIT)
-    time_label = display.add_time_label_to_group(group, display_width=disp.width, display_height=disp.height, scale=1)
+    battery_icon.set_state(display.BatteryIcon.CHARGING)
+    time_label = display.add_time_label_to_group(
+        group, display_width=disp.width, display_height=disp.height, scale=1
+    )
 
 # Network manager
 net = networking.NetworkManager(healthcheck_every_s=30.0, wifi_retry_s=5.0, debug=True) if enable_wifi else None
@@ -132,8 +134,8 @@ while True:
         tm.update_metric("pm25_ugm3", float(pm25), ts=now)
         tm.update_metric("aqi_us", int(aqi_us), ts=now)
 
-        if enable_display and pm_lbl and aqi_lbl and aqi_desc_label:
-            display.update_pm_aqi(pm_lbl, aqi_lbl, aqi_desc_label, pm25, aqi_us)
+        if enable_display and dashboard_labels:
+            display.update_dashboard(dashboard_labels, pm25, aqi_us)
 
     if enable_display and time_label and now >= next_time:
         next_time = now + 1.0
