@@ -5,6 +5,8 @@ import busio
 import tinys3
 import os
 import adafruit_sht4x
+import adafruit_sgp40
+import math
 
 import sps30_uart
 import pixel_wheel
@@ -18,6 +20,16 @@ enable_sps30 = True
 enable_display = True
 enable_wifi = True
 enable_sht4x = True
+enable_sgp40 = True
+
+# Sensirion lab-only approximation. Valid only with the specified tuning + ethanol calibration.
+def voc_index_to_tvoc_ethanol_ppb(voc_index: float) -> float:
+    # Clamp to avoid log(<=0)
+    vi = max(1.0, min(500.0, float(voc_index)))
+    return (math.log(501.0 - vi) - 6.24) * (-381.97)
+
+def voc_index_to_tvoc_ethanol_ppm(voc_index: float) -> float:
+    return voc_index_to_tvoc_ethanol_ppb(voc_index) / 1000.0
 
 # NeoPixel
 pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.GRB)
@@ -74,23 +86,33 @@ tm = telemetry.TelemetryManager(
 PM_EVERY_S = 5.0
 SHT4X_EVERY_S = 60.0
 SHT4X_FIRST_DELAY_S = 5.0
+SGP40_EVERY_S = 5.0
+SGP40_FIRST_DELAY_S = 7.0
 PIXEL_EVERY_S = 5.0
 LOOP_SLEEP_S = 0.05
 
 next_pm = 0.0
 next_sht4x = 0.0
+next_sgp40 = 0.0
 next_pixel = 0.0
 next_time = 0.0
 time_synced = False
 next_time_sync = 0.0
 last_pm25 = None
 last_aqi_us = None
+last_temp_c = None
+last_rh_pct = None
+last_tvoc = None
+last_voc_index = None
 
 # ---------- I2C sensors ----------
 i2c = busio.I2C(board.SCL, board.SDA)
 sht4x = adafruit_sht4x.SHT4x(i2c) if enable_sht4x else None
+sgp40 = adafruit_sgp40.SGP40(i2c) if enable_sgp40 else None
 if enable_sht4x:
     next_sht4x = time.monotonic() + SHT4X_FIRST_DELAY_S
+if enable_sgp40:
+    next_sgp40 = time.monotonic() + SGP40_FIRST_DELAY_S
 
 # ---------- Main loop ----------
 while True:
@@ -159,6 +181,8 @@ while True:
         temp_c = sht4x.temperature
         rh_pct = sht4x.relative_humidity
         print(f"Temp={temp_c:.2f}C RH={rh_pct:.1f}%")
+        last_temp_c = temp_c
+        last_rh_pct = rh_pct
         tm.update_metric("temp_c", float(temp_c), ts=now)
         tm.update_metric("rh_pct", float(rh_pct), ts=now)
         if enable_display and dashboard_labels:
@@ -169,6 +193,30 @@ while True:
                     last_aqi_us,
                     temp_c=temp_c,
                     rh_pct=rh_pct,
+                )
+
+    # --- SGP40 read + serial log (scheduled) ---
+    if enable_sgp40 and sgp40 and now >= next_sgp40:
+        next_sgp40 = now + SGP40_EVERY_S
+        comp_temp = last_temp_c if last_temp_c is not None else 25.0
+        comp_rh = last_rh_pct if last_rh_pct is not None else 50.0
+        voc_index = sgp40.measure_index(temperature=comp_temp, relative_humidity=comp_rh)
+        tvoc_ppm = voc_index_to_tvoc_ethanol_ppm(voc_index)
+        print(f"TVOC={tvoc_ppm:.3f}ppm VOC_INDEX={voc_index}")
+        last_tvoc = tvoc_ppm
+        last_voc_index = voc_index
+        tm.update_metric("voc_ppm", float(tvoc_ppm), ts=now)
+        tm.update_metric("voc_index", int(voc_index), ts=now)
+        if enable_display and dashboard_labels:
+            if last_pm25 is not None and last_aqi_us is not None:
+                display.update_dashboard(
+                    dashboard_labels,
+                    last_pm25,
+                    last_aqi_us,
+                    temp_c=last_temp_c,
+                    rh_pct=last_rh_pct,
+                    tvoc=tvoc_ppm,
+                    voc_index=voc_index,
                 )
 
     if enable_display and time_label and now >= next_time:

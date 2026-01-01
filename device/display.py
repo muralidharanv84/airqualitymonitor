@@ -421,7 +421,7 @@ def make_dashboard(display_width=240, display_height=320):
     return group, labels, wifi_icon, battery_icon
 
 
-def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None):
+def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None, tvoc=None, voc_index=None):
     color, desc = utils.get_classification_from_aqi(int(aqi))
 
     labels["aqi_title"].color = color
@@ -439,3 +439,17 @@ def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None):
         labels["temp_value"].text = f"{temp_c:.1f}C"
     if rh_pct is not None:
         labels["rh_value"].text = f"{int(round(rh_pct))}%"
+    if tvoc is not None:
+        if tvoc < 1.0:
+            tvoc_text = f"{tvoc:.3f}"
+            if tvoc_text.startswith("0."):
+                tvoc_text = tvoc_text[1:]
+        elif tvoc < 10.0:
+            tvoc_text = f"{tvoc:.2f}"
+        elif tvoc < 100.0:
+            tvoc_text = f"{tvoc:.1f}"
+        else:
+            tvoc_text = f"{tvoc:.0f}"
+        labels["tvoc_value"].text = tvoc_text
+    if voc_index is not None:
+        labels["tvoc_index_value"].text = f"{int(round(voc_index))}"
