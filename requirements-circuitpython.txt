@@ -3,3 +3,4 @@ adafruit_display_text
 adafruit_requests
 adafruit_hashlib
 adafruit_ntp
+adafruit_sht4x

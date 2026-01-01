@@ -1,8 +1,10 @@
 import time, gc
 import neopixel
 import board
+import busio
 import tinys3
 import os
+import adafruit_sht4x
 
 import sps30_uart
 import pixel_wheel
@@ -15,6 +17,7 @@ enable_pixel_wheel = True
 enable_sps30 = True
 enable_display = True
 enable_wifi = True
+enable_sht4x = True
 
 # NeoPixel
 pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.GRB)
@@ -69,14 +72,25 @@ tm = telemetry.TelemetryManager(
 )
 # Scheduling (monotonic timers)
 PM_EVERY_S = 5.0
+SHT4X_EVERY_S = 60.0
+SHT4X_FIRST_DELAY_S = 5.0
 PIXEL_EVERY_S = 5.0
 LOOP_SLEEP_S = 0.05
 
 next_pm = 0.0
+next_sht4x = 0.0
 next_pixel = 0.0
 next_time = 0.0
 time_synced = False
 next_time_sync = 0.0
+last_pm25 = None
+last_aqi_us = None
+
+# ---------- I2C sensors ----------
+i2c = busio.I2C(board.SCL, board.SDA)
+sht4x = adafruit_sht4x.SHT4x(i2c) if enable_sht4x else None
+if enable_sht4x:
+    next_sht4x = time.monotonic() + SHT4X_FIRST_DELAY_S
 
 # ---------- Main loop ----------
 while True:
@@ -130,12 +144,32 @@ while True:
         pm25 = sps30_uart.read_pm25()
         aqi_us = utils.aqi_us_from_pm25(pm25)
         print(f"PM2.5={pm25:.1f} AQI_US={aqi_us}")
+        last_pm25 = pm25
+        last_aqi_us = aqi_us
         now = time.monotonic()
         tm.update_metric("pm25_ugm3", float(pm25), ts=now)
         tm.update_metric("aqi_us", int(aqi_us), ts=now)
 
         if enable_display and dashboard_labels:
             display.update_dashboard(dashboard_labels, pm25, aqi_us)
+
+    # --- SHT4x read + serial log (scheduled) ---
+    if enable_sht4x and sht4x and now >= next_sht4x:
+        next_sht4x = now + SHT4X_EVERY_S
+        temp_c = sht4x.temperature
+        rh_pct = sht4x.relative_humidity
+        print(f"Temp={temp_c:.2f}C RH={rh_pct:.1f}%")
+        tm.update_metric("temp_c", float(temp_c), ts=now)
+        tm.update_metric("rh_pct", float(rh_pct), ts=now)
+        if enable_display and dashboard_labels:
+            if last_pm25 is not None and last_aqi_us is not None:
+                display.update_dashboard(
+                    dashboard_labels,
+                    last_pm25,
+                    last_aqi_us,
+                    temp_c=temp_c,
+                    rh_pct=rh_pct,
+                )
 
     if enable_display and time_label and now >= next_time:
         next_time = now + 1.0

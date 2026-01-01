@@ -421,7 +421,7 @@ def make_dashboard(display_width=240, display_height=320):
     return group, labels, wifi_icon, battery_icon
 
 
-def update_dashboard(labels, pm25, aqi):
+def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None):
     color, desc = utils.get_classification_from_aqi(int(aqi))
 
     labels["aqi_title"].color = color
@@ -434,3 +434,8 @@ def update_dashboard(labels, pm25, aqi):
     labels["pm25_value"].text = f"{pm25:.0f}"
     labels["pm25_value"].color = color
     labels["pm25_unit"].color = color
+
+    if temp_c is not None:
+        labels["temp_value"].text = f"{temp_c:.1f}C"
+    if rh_pct is not None:
+        labels["rh_value"].text = f"{int(round(rh_pct))}%"
