@@ -415,6 +415,7 @@ def make_dashboard(display_width=240, display_height=320):
         "tvoc_value": tvoc_value,
         "temp_value": temp_value,
         "rh_value": rh_value,
+        "tvoc_index_label": tvoc_index_label,
         "tvoc_index_value": tvoc_index_value,
     }
 
@@ -439,6 +440,12 @@ def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None, tvoc=None, voc
         labels["temp_value"].text = f"{temp_c:.1f}C"
     if rh_pct is not None:
         labels["rh_value"].text = f"{int(round(rh_pct))}%"
+    voc_color = None
+    if voc_index is not None:
+        voc_color, _ = utils.get_classification_from_voc_index(int(round(voc_index)))
+        labels["tvoc_index_label"].color = voc_color
+        labels["tvoc_index_value"].color = voc_color
+        labels["tvoc_index_value"].text = f"{int(round(voc_index))}"
     if tvoc is not None:
         if tvoc < 1.0:
             tvoc_text = f"{tvoc:.3f}"
@@ -451,5 +458,5 @@ def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None, tvoc=None, voc
         else:
             tvoc_text = f"{tvoc:.0f}"
         labels["tvoc_value"].text = tvoc_text
-    if voc_index is not None:
-        labels["tvoc_index_value"].text = f"{int(round(voc_index))}"
+        if voc_color is not None:
+            labels["tvoc_value"].color = voc_color

@@ -82,3 +82,23 @@ def get_classification_from_aqi(aqi_us):
         color = 0x7E0023
         desc = "Hazardous"
     return compensate_color(color), desc
+
+def get_classification_from_voc_index(voc_index):
+    color = 0xFFFFFF
+    desc = "Description"
+    if voc_index <= 150:
+        color = 0x00E400
+        desc = "Normal"
+    elif voc_index <= 175:
+        color = 0xFFFF00
+        desc = "Elevated"
+    elif voc_index <= 210:
+        color = 0xFF8C00
+        desc = "High"
+    elif voc_index <= 335:
+        color = 0xFF0000
+        desc = "Very High"
+    else:
+        color = 0x7E0023
+        desc = "Severe"
+    return compensate_color(color), desc
