@@ -4,4 +4,5 @@ adafruit_requests
 adafruit_hashlib
 adafruit_ntp
 adafruit_sgp40
+adafruit_scd4x
 adafruit_sht4x

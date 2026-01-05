@@ -6,6 +6,7 @@ import tinys3
 import os
 import adafruit_sht4x
 import adafruit_sgp40
+import adafruit_scd4x
 import math
 
 import sps30_uart
@@ -21,6 +22,7 @@ enable_display = True
 enable_wifi = True
 enable_sht4x = True
 enable_sgp40 = True
+enable_scd40 = True
 
 # Sensirion lab-only approximation. Valid only with the specified tuning + ethanol calibration.
 def voc_index_to_tvoc_ethanol_ppb(voc_index: float) -> float:
@@ -88,12 +90,15 @@ SHT4X_EVERY_S = 60.0
 SHT4X_FIRST_DELAY_S = 5.0
 SGP40_EVERY_S = 5.0
 SGP40_FIRST_DELAY_S = 7.0
+SCD40_EVERY_S = 5.0
+SCD40_FIRST_DELAY_S = 10.0
 PIXEL_EVERY_S = 5.0
 LOOP_SLEEP_S = 0.05
 
 next_pm = 0.0
 next_sht4x = 0.0
 next_sgp40 = 0.0
+next_scd40 = 0.0
 next_pixel = 0.0
 next_time = 0.0
 time_synced = False
@@ -109,10 +114,14 @@ last_voc_index = None
 i2c = busio.I2C(board.SCL, board.SDA)
 sht4x = adafruit_sht4x.SHT4x(i2c) if enable_sht4x else None
 sgp40 = adafruit_sgp40.SGP40(i2c) if enable_sgp40 else None
+scd40 = adafruit_scd4x.SCD4X(i2c) if enable_scd40 else None
 if enable_sht4x:
     next_sht4x = time.monotonic() + SHT4X_FIRST_DELAY_S
 if enable_sgp40:
     next_sgp40 = time.monotonic() + SGP40_FIRST_DELAY_S
+if enable_scd40 and scd40:
+    scd40.start_periodic_measurement()
+    next_scd40 = time.monotonic() + SCD40_FIRST_DELAY_S
 
 # ---------- Main loop ----------
 while True:
@@ -218,6 +227,15 @@ while True:
                     tvoc=tvoc_ppm,
                     voc_index=voc_index,
                 )
+
+    # --- SCD40 read + serial log (scheduled) ---
+    if enable_scd40 and scd40 and now >= next_scd40:
+        next_scd40 = now + SCD40_EVERY_S
+        if scd40.data_ready:
+            co2 = scd40.CO2
+            scd_temp_c = scd40.temperature
+            scd_rh_pct = scd40.relative_humidity
+            print(f"SCD40 CO2={co2}ppm Temp={scd_temp_c:.2f}C RH={scd_rh_pct:.1f}%")
 
     if enable_display and time_label and now >= next_time:
         next_time = now + 1.0
