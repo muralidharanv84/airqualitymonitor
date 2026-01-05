@@ -105,6 +105,7 @@ time_synced = False
 next_time_sync = 0.0
 last_pm25 = None
 last_aqi_us = None
+last_co2_ppm = None
 last_temp_c = None
 last_rh_pct = None
 last_tvoc = None
@@ -120,6 +121,7 @@ if enable_sht4x:
 if enable_sgp40:
     next_sgp40 = time.monotonic() + SGP40_FIRST_DELAY_S
 if enable_scd40 and scd40:
+    print("Starting periodic measurement for SCD40")
     scd40.start_periodic_measurement()
     next_scd40 = time.monotonic() + SCD40_FIRST_DELAY_S
 
@@ -182,7 +184,7 @@ while True:
         tm.update_metric("aqi_us", int(aqi_us), ts=now)
 
         if enable_display and dashboard_labels:
-            display.update_dashboard(dashboard_labels, pm25, aqi_us)
+            display.update_dashboard(dashboard_labels, pm25, aqi_us, co2_ppm=last_co2_ppm)
 
     # --- SHT4x read + serial log (scheduled) ---
     if enable_sht4x and sht4x and now >= next_sht4x:
@@ -200,6 +202,7 @@ while True:
                     dashboard_labels,
                     last_pm25,
                     last_aqi_us,
+                    co2_ppm=last_co2_ppm,
                     temp_c=temp_c,
                     rh_pct=rh_pct,
                 )
@@ -222,6 +225,7 @@ while True:
                     dashboard_labels,
                     last_pm25,
                     last_aqi_us,
+                    co2_ppm=last_co2_ppm,
                     temp_c=last_temp_c,
                     rh_pct=last_rh_pct,
                     tvoc=tvoc_ppm,
@@ -236,6 +240,22 @@ while True:
             scd_temp_c = scd40.temperature
             scd_rh_pct = scd40.relative_humidity
             print(f"SCD40 CO2={co2}ppm Temp={scd_temp_c:.2f}C RH={scd_rh_pct:.1f}%")
+            last_co2_ppm = co2
+            tm.update_metric("co2_ppm", int(co2), ts=now)
+            if enable_display and dashboard_labels:
+                if last_pm25 is not None and last_aqi_us is not None:
+                    display.update_dashboard(
+                        dashboard_labels,
+                        last_pm25,
+                        last_aqi_us,
+                        co2_ppm=co2,
+                        temp_c=last_temp_c,
+                        rh_pct=last_rh_pct,
+                        tvoc=last_tvoc,
+                        voc_index=last_voc_index,
+                    )
+        else:
+            print(f"SCD40 is not data_ready!")
 
     if enable_display and time_label and now >= next_time:
         next_time = now + 1.0

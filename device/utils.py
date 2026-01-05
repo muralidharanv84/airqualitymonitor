@@ -102,3 +102,20 @@ def get_classification_from_voc_index(voc_index):
         color = 0x7E0023
         desc = "Severe"
     return compensate_color(color), desc
+
+def get_classification_from_co2(co2_ppm):
+    color = 0xFFFFFF
+    desc = "Description"
+    if co2_ppm <= 800:
+        color = 0x00E400
+        desc = "Normal"
+    elif co2_ppm <= 1000:
+        color = 0xFFFF00
+        desc = "Elevated"
+    elif co2_ppm <= 1500:
+        color = 0xFF8C00
+        desc = "High"
+    else:
+        color = 0xFF0000
+        desc = "Very High"
+    return compensate_color(color), desc

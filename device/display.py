@@ -411,8 +411,12 @@ def make_dashboard(display_width=240, display_height=320):
         "pm25_label": pm25_label,
         "pm25_value": pm25_value,
         "pm25_unit": pm25_unit,
+        "co2_label": co2_label,
         "co2_value": co2_value,
+        "co2_unit": co2_unit,
+        "tvoc_label": tvoc_label,
         "tvoc_value": tvoc_value,
+        "tvoc_unit": tvoc_unit,
         "temp_value": temp_value,
         "rh_value": rh_value,
         "tvoc_index_label": tvoc_index_label,
@@ -422,7 +426,7 @@ def make_dashboard(display_width=240, display_height=320):
     return group, labels, wifi_icon, battery_icon
 
 
-def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None, tvoc=None, voc_index=None):
+def update_dashboard(labels, pm25, aqi, co2_ppm=None, temp_c=None, rh_pct=None, tvoc=None, voc_index=None):
     color, desc = utils.get_classification_from_aqi(int(aqi))
 
     labels["aqi_title"].color = color
@@ -435,6 +439,13 @@ def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None, tvoc=None, voc
     labels["pm25_value"].text = f"{pm25:.0f}"
     labels["pm25_value"].color = color
     labels["pm25_unit"].color = color
+
+    if co2_ppm is not None:
+        co2_color, _ = utils.get_classification_from_co2(int(round(co2_ppm)))
+        labels["co2_label"].color = co2_color
+        labels["co2_value"].color = co2_color
+        labels["co2_unit"].color = co2_color
+        labels["co2_value"].text = f"{int(round(co2_ppm))}"
 
     if temp_c is not None:
         labels["temp_value"].text = f"{temp_c:.1f}C"
@@ -459,4 +470,6 @@ def update_dashboard(labels, pm25, aqi, temp_c=None, rh_pct=None, tvoc=None, voc
             tvoc_text = f"{tvoc:.0f}"
         labels["tvoc_value"].text = tvoc_text
         if voc_color is not None:
+            labels["tvoc_label"].color = voc_color
             labels["tvoc_value"].color = voc_color
+            labels["tvoc_unit"].color = voc_color
