@@ -107,7 +107,7 @@ def wake_up():
 
     time.sleep(1.2)
 
-def read_pm25():
+def read_pm():
 
     send_cmd(0x03)  # Read measured values  [oai_citation:9‡SparkFun](https://cdn.sparkfun.com/assets/4/e/e/f/8/Sensirion_PM_Sensors_Datasheet_SPS30.pdf)
     data = parse_miso(read_frame(1.0), expect_cmd=0x03)
@@ -117,6 +117,6 @@ def read_pm25():
     pm4  = struct.unpack(">f", data[8:12])[0]
     pm10 = struct.unpack(">f", data[12:16])[0]
 
-    return pm25
+    return pm1, pm25, pm4, pm10
 
 

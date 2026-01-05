@@ -163,9 +163,9 @@ while True:
     if enable_sps30 and now >= next_pm:
         next_pm = now + PM_EVERY_S
 
-        pm25 = sps30_uart.read_pm25()
+        pm1, pm25, pm4, pm10 = sps30_uart.read_pm()
         aqi_us = utils.aqi_us_from_pm25(pm25)
-        print(f"PM2.5={pm25:.1f} AQI_US={aqi_us}")
+        print(f"PM2.5={pm25:.1f} AQI_US={aqi_us} PM1={pm1:.1f} PM4={pm4:.1f} PM10={pm10:.1f}")
         last_pm25 = pm25
         last_aqi_us = aqi_us
         now = time.monotonic()
