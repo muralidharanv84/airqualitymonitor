@@ -340,7 +340,29 @@ def _make_label(text, color, scale, anchor_point, anchored_position):
     return lbl
 
 
-def make_dashboard(display_width=240, display_height=320):
+def _column_centers(count, display_width):
+    if count <= 0:
+        return ()
+    if count == 1:
+        return (display_width // 2,)
+    if count == 2:
+        return (70, display_width - 70)
+    if count == 3:
+        return (40, display_width // 2, display_width - 40)
+    margin = 20
+    usable = display_width - (2 * margin)
+    step = usable / (count - 1)
+    return tuple(int(margin + (step * i)) for i in range(count))
+
+
+def make_dashboard(
+    display_width=240,
+    display_height=320,
+    enabled_sps30=True,
+    enabled_scd40=True,
+    enabled_sgp40=True,
+    enabled_temp_rh=True,
+):
     group = displayio.Group()
 
     margin = 6
@@ -367,61 +389,57 @@ def make_dashboard(display_width=240, display_height=320):
         " ", 0xFFFFFF, 2, (0.5, 0.5), (display_width // 2, 134)
     )
 
-    col_x = (40, 120, 200)
     row1_label_y = 176
     row1_value_y = 200
     row1_unit_y = 220
     row2_label_y = 244
     row2_value_y = 268
 
-    co2_label = _make_label("CO2", 0xFFFFFF, 1, (0.5, 0.5), (col_x[0], row1_label_y))
-    pm25_label = _make_label("PM2.5", 0xFFFFFF, 1, (0.5, 0.5), (col_x[1], row1_label_y))
-    tvoc_label = _make_label("TVOC", 0xFFFFFF, 1, (0.5, 0.5), (col_x[2], row1_label_y))
+    row1_items = []
+    if enabled_scd40:
+        row1_items.append(("co2", "CO2", "ppm"))
+    if enabled_sps30:
+        row1_items.append(("pm25", "PM2.5", "ug / m3"))
+    if enabled_sgp40:
+        row1_items.append(("tvoc", "TVOC", "ppm"))
 
-    co2_value = _make_label(" ", 0xFFFFFF, 3, (0.5, 0.5), (col_x[0], row1_value_y))
-    pm25_value = _make_label("--", 0xFFFFFF, 3, (0.5, 0.5), (col_x[1], row1_value_y))
-    tvoc_value = _make_label(" ", 0xFFFFFF, 3, (0.5, 0.5), (col_x[2], row1_value_y))
+    row2_items = []
+    if enabled_temp_rh:
+        row2_items.append(("temp", "Temp", None))
+        row2_items.append(("rh", "RH", None))
+    if enabled_sgp40:
+        row2_items.append(("voc_index", "VOC Ix", None))
 
-    co2_unit = _make_label("ppm", 0xFFFFFF, 1, (0.5, 0.5), (col_x[0], row1_unit_y))
-    pm25_unit = _make_label("ug / m3", 0xFFFFFF, 1, (0.5, 0.5), (col_x[1], row1_unit_y))
-    tvoc_unit = _make_label("ppm", 0xFFFFFF, 1, (0.5, 0.5), (col_x[2], row1_unit_y))
-
-    temp_label = _make_label("Temp", 0xFFFFFF, 1, (0.5, 0.5), (col_x[0], row2_label_y))
-    rh_label = _make_label("RH", 0xFFFFFF, 1, (0.5, 0.5), (col_x[1], row2_label_y))
-    tvoc_index_label = _make_label("VOC Ix", 0xFFFFFF, 1, (0.5, 0.5), (col_x[2], row2_label_y))
-
-    temp_value = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (col_x[0], row2_value_y))
-    rh_value = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (col_x[1], row2_value_y))
-    tvoc_index_value = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (col_x[2], row2_value_y))
-
-    for item in (
-        aqi_title, aqi_value, aqi_desc,
-        co2_label, pm25_label, tvoc_label,
-        co2_value, pm25_value, tvoc_value,
-        co2_unit, pm25_unit, tvoc_unit,
-        temp_label, rh_label, tvoc_index_label,
-        temp_value, rh_value, tvoc_index_value,
-    ):
-        group.append(item)
+    row1_x = _column_centers(len(row1_items), display_width)
+    row2_x = _column_centers(len(row2_items), display_width)
 
     labels = {
         "aqi_title": aqi_title,
         "aqi_value": aqi_value,
         "aqi_desc": aqi_desc,
-        "pm25_label": pm25_label,
-        "pm25_value": pm25_value,
-        "pm25_unit": pm25_unit,
-        "co2_label": co2_label,
-        "co2_value": co2_value,
-        "co2_unit": co2_unit,
-        "tvoc_label": tvoc_label,
-        "tvoc_value": tvoc_value,
-        "tvoc_unit": tvoc_unit,
-        "temp_value": temp_value,
-        "rh_value": rh_value,
-        "tvoc_index_label": tvoc_index_label,
-        "tvoc_index_value": tvoc_index_value,
     }
+
+    for (key, title, unit), x in zip(row1_items, row1_x):
+        label_item = _make_label(title, 0xFFFFFF, 1, (0.5, 0.5), (x, row1_label_y))
+        value_item = _make_label(" ", 0xFFFFFF, 3, (0.5, 0.5), (x, row1_value_y))
+        unit_item = _make_label(unit or " ", 0xFFFFFF, 1, (0.5, 0.5), (x, row1_unit_y))
+        group.append(label_item)
+        group.append(value_item)
+        group.append(unit_item)
+        labels[f"{key}_label"] = label_item
+        labels[f"{key}_value"] = value_item
+        labels[f"{key}_unit"] = unit_item
+
+    for (key, title, _unit), x in zip(row2_items, row2_x):
+        label_item = _make_label(title, 0xFFFFFF, 1, (0.5, 0.5), (x, row2_label_y))
+        value_item = _make_label(" ", 0xFFFFFF, 2, (0.5, 0.5), (x, row2_value_y))
+        group.append(label_item)
+        group.append(value_item)
+        labels[f"{key}_label"] = label_item
+        labels[f"{key}_value"] = value_item
+
+    for item in (aqi_title, aqi_value, aqi_desc):
+        group.append(item)
 
     return group, labels, wifi_icon, battery_icon
 
@@ -435,29 +453,30 @@ def update_dashboard(labels, pm25, aqi, co2_ppm=None, temp_c=None, rh_pct=None, 
     labels["aqi_desc"].text = desc
     labels["aqi_desc"].color = color
 
-    labels["pm25_label"].color = color
-    labels["pm25_value"].text = f"{pm25:.0f}"
-    labels["pm25_value"].color = color
-    labels["pm25_unit"].color = color
+    if "pm25_label" in labels:
+        labels["pm25_label"].color = color
+        labels["pm25_value"].text = f"{pm25:.0f}"
+        labels["pm25_value"].color = color
+        labels["pm25_unit"].color = color
 
-    if co2_ppm is not None:
+    if co2_ppm is not None and "co2_label" in labels:
         co2_color, _ = utils.get_classification_from_co2(int(round(co2_ppm)))
         labels["co2_label"].color = co2_color
         labels["co2_value"].color = co2_color
         labels["co2_unit"].color = co2_color
         labels["co2_value"].text = f"{int(round(co2_ppm))}"
 
-    if temp_c is not None:
+    if temp_c is not None and "temp_value" in labels:
         labels["temp_value"].text = f"{temp_c:.1f}C"
-    if rh_pct is not None:
+    if rh_pct is not None and "rh_value" in labels:
         labels["rh_value"].text = f"{int(round(rh_pct))}%"
     voc_color = None
-    if voc_index is not None:
+    if voc_index is not None and "voc_index_label" in labels:
         voc_color, _ = utils.get_classification_from_voc_index(int(round(voc_index)))
-        labels["tvoc_index_label"].color = voc_color
-        labels["tvoc_index_value"].color = voc_color
-        labels["tvoc_index_value"].text = f"{int(round(voc_index))}"
-    if tvoc is not None:
+        labels["voc_index_label"].color = voc_color
+        labels["voc_index_value"].color = voc_color
+        labels["voc_index_value"].text = f"{int(round(voc_index))}"
+    if tvoc is not None and "tvoc_value" in labels:
         if tvoc < 1.0:
             tvoc_text = f"{tvoc:.3f}"
             if tvoc_text.startswith("0."):

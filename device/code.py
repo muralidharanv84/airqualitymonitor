@@ -15,14 +15,18 @@ import utils
 import display
 import networking
 import telemetry
+import device_config
 
-enable_pixel_wheel = True
-enable_sps30 = True
-enable_display = True
-enable_wifi = True
-enable_sht4x = True
-enable_sgp40 = True
-enable_scd40 = True
+config_device_id = os.getenv("DEVICE_ID")
+device_cfg = device_config.load_device_config(config_device_id)
+
+enable_pixel_wheel = device_cfg["enable_pixel_wheel"]
+enable_sps30 = device_cfg["enable_sps30"]
+enable_display = device_cfg["enable_display"]
+enable_wifi = device_cfg["enable_wifi"]
+enable_sht4x = device_cfg["enable_sht4x"]
+enable_sgp40 = device_cfg["enable_sgp40"]
+enable_scd40 = device_cfg["enable_scd40"]
 
 # Sensirion lab-only approximation. Valid only with the specified tuning + ethanol calibration.
 def voc_index_to_tvoc_ethanol_ppb(voc_index: float) -> float:
@@ -57,7 +61,12 @@ time_label = None
 if enable_display:
     disp = display.init_display()
     group, dashboard_labels, wifi_icon, battery_icon = display.make_dashboard(
-        display_width=disp.width, display_height=disp.height
+        display_width=disp.width,
+        display_height=disp.height,
+        enabled_sps30=enable_sps30,
+        enabled_scd40=enable_scd40,
+        enabled_sgp40=enable_sgp40,
+        enabled_temp_rh=(enable_sht4x or enable_scd40),
     )
     disp.root_group = group
 
@@ -242,6 +251,11 @@ while True:
             print(f"SCD40 CO2={co2}ppm Temp={scd_temp_c:.2f}C RH={scd_rh_pct:.1f}%")
             last_co2_ppm = co2
             tm.update_metric("co2_ppm", int(co2), ts=now)
+            if not enable_sht4x:
+                last_temp_c = scd_temp_c
+                last_rh_pct = scd_rh_pct
+                tm.update_metric("temp_c", float(scd_temp_c), ts=now)
+                tm.update_metric("rh_pct", float(scd_rh_pct), ts=now)
             if enable_display and dashboard_labels:
                 if last_pm25 is not None and last_aqi_us is not None:
                     display.update_dashboard(
