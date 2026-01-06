@@ -1,8 +1,7 @@
 import time, gc
-import neopixel
 import board
 import busio
-import tinys3
+#import tinys3
 import os
 import adafruit_sht4x
 import adafruit_sgp40
@@ -10,7 +9,6 @@ import adafruit_scd4x
 import math
 
 import sps30_uart
-import pixel_wheel
 import utils
 import display
 import networking
@@ -27,6 +25,12 @@ enable_wifi = device_cfg["enable_wifi"]
 enable_sht4x = device_cfg["enable_sht4x"]
 enable_sgp40 = device_cfg["enable_sgp40"]
 enable_scd40 = device_cfg["enable_scd40"]
+board_type = device_cfg["board_type"]
+display_invert = device_cfg["display_invert"]
+
+if enable_pixel_wheel:
+    import neopixel
+    import pixel_wheel
 
 # Sensirion lab-only approximation. Valid only with the specified tuning + ethanol calibration.
 def voc_index_to_tvoc_ethanol_ppb(voc_index: float) -> float:
@@ -38,10 +42,12 @@ def voc_index_to_tvoc_ethanol_ppm(voc_index: float) -> float:
     return voc_index_to_tvoc_ethanol_ppb(voc_index) / 1000.0
 
 # NeoPixel
-pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.GRB)
+pixel = None
+if enable_pixel_wheel:
+    pixel = neopixel.NeoPixel(board.NEOPIXEL, 1, brightness=0.3, auto_write=True, pixel_order=neopixel.GRB)
 color_index = 0
 
-print("\nHello from TinyS3!")
+print("\nHello from CircuitPython!")
 print("----------------------\n")
 print("Free RAM:", gc.mem_free())
 
@@ -59,22 +65,26 @@ battery_icon = None
 time_label = None
 
 if enable_display:
-    disp = display.init_display()
-    group, dashboard_labels, wifi_icon, battery_icon = display.make_dashboard(
-        display_width=disp.width,
-        display_height=disp.height,
-        enabled_sps30=enable_sps30,
-        enabled_scd40=enable_scd40,
-        enabled_sgp40=enable_sgp40,
-        enabled_temp_rh=(enable_sht4x or enable_scd40),
-    )
-    disp.root_group = group
+    disp = display.init_display(board_type=board_type, display_invert=display_invert)
+    if disp is None or not hasattr(disp, "width") or disp.width is None:
+        print("Display init failed; disabling display output.")
+        enable_display = False
+    else:
+        group, dashboard_labels, wifi_icon, battery_icon = display.make_dashboard(
+            display_width=disp.width,
+            display_height=disp.height,
+            enabled_sps30=enable_sps30,
+            enabled_scd40=enable_scd40,
+            enabled_sgp40=enable_sgp40,
+            enabled_temp_rh=(enable_sht4x or enable_scd40),
+        )
+        disp.root_group = group
 
-    wifi_icon.set_state(display.WifiIcon.INIT)
-    battery_icon.set_state(display.BatteryIcon.CHARGING)
-    time_label = display.add_time_label_to_group(
-        group, display_width=disp.width, display_height=disp.height, scale=1
-    )
+        wifi_icon.set_state(display.WifiIcon.INIT)
+        battery_icon.set_state(display.BatteryIcon.CHARGING)
+        time_label = display.add_time_label_to_group(
+            group, display_width=disp.width, display_height=disp.height, scale=1
+        )
 
 # Network manager
 net = networking.NetworkManager(healthcheck_every_s=30.0, wifi_retry_s=5.0, debug=True) if enable_wifi else None
@@ -121,7 +131,26 @@ last_tvoc = None
 last_voc_index = None
 
 # ---------- I2C sensors ----------
-i2c = busio.I2C(board.SCL, board.SDA)
+def init_i2c(board_type):
+    if board_type == "waveshare_s3_lcd_28":
+        if hasattr(board, "I2C_SCL") and hasattr(board, "I2C_SDA"):
+            try:
+                return busio.I2C(board.I2C_SCL, board.I2C_SDA)
+            except Exception:
+                pass
+    if board_type == "tinys3":
+        try:
+            return busio.I2C(board.SCL, board.SDA)
+        except Exception:
+            pass
+    if hasattr(board, "I2C"):
+        try:
+            return board.I2C()
+        except Exception:
+            pass
+    return busio.I2C(board.SCL, board.SDA)
+
+i2c = init_i2c(board_type)
 sht4x = adafruit_sht4x.SHT4x(i2c) if enable_sht4x else None
 sgp40 = adafruit_sgp40.SGP40(i2c) if enable_sgp40 else None
 scd40 = adafruit_scd4x.SCD4X(i2c) if enable_scd40 else None
@@ -206,15 +235,14 @@ while True:
         tm.update_metric("temp_c", float(temp_c), ts=now)
         tm.update_metric("rh_pct", float(rh_pct), ts=now)
         if enable_display and dashboard_labels:
-            if last_pm25 is not None and last_aqi_us is not None:
-                display.update_dashboard(
-                    dashboard_labels,
-                    last_pm25,
-                    last_aqi_us,
-                    co2_ppm=last_co2_ppm,
-                    temp_c=temp_c,
-                    rh_pct=rh_pct,
-                )
+            display.update_dashboard(
+                dashboard_labels,
+                pm25=last_pm25,
+                aqi=last_aqi_us,
+                co2_ppm=last_co2_ppm,
+                temp_c=temp_c,
+                rh_pct=rh_pct,
+            )
 
     # --- SGP40 read + serial log (scheduled) ---
     if enable_sgp40 and sgp40 and now >= next_sgp40:
@@ -229,17 +257,16 @@ while True:
         tm.update_metric("voc_ppm", float(tvoc_ppm), ts=now)
         tm.update_metric("voc_index", int(voc_index), ts=now)
         if enable_display and dashboard_labels:
-            if last_pm25 is not None and last_aqi_us is not None:
-                display.update_dashboard(
-                    dashboard_labels,
-                    last_pm25,
-                    last_aqi_us,
-                    co2_ppm=last_co2_ppm,
-                    temp_c=last_temp_c,
-                    rh_pct=last_rh_pct,
-                    tvoc=tvoc_ppm,
-                    voc_index=voc_index,
-                )
+            display.update_dashboard(
+                dashboard_labels,
+                pm25=last_pm25,
+                aqi=last_aqi_us,
+                co2_ppm=last_co2_ppm,
+                temp_c=last_temp_c,
+                rh_pct=last_rh_pct,
+                tvoc=tvoc_ppm,
+                voc_index=voc_index,
+            )
 
     # --- SCD40 read + serial log (scheduled) ---
     if enable_scd40 and scd40 and now >= next_scd40:
@@ -257,17 +284,16 @@ while True:
                 tm.update_metric("temp_c", float(scd_temp_c), ts=now)
                 tm.update_metric("rh_pct", float(scd_rh_pct), ts=now)
             if enable_display and dashboard_labels:
-                if last_pm25 is not None and last_aqi_us is not None:
-                    display.update_dashboard(
-                        dashboard_labels,
-                        last_pm25,
-                        last_aqi_us,
-                        co2_ppm=co2,
-                        temp_c=last_temp_c,
-                        rh_pct=last_rh_pct,
-                        tvoc=last_tvoc,
-                        voc_index=last_voc_index,
-                    )
+                display.update_dashboard(
+                    dashboard_labels,
+                    pm25=last_pm25,
+                    aqi=last_aqi_us,
+                    co2_ppm=co2,
+                    temp_c=last_temp_c,
+                    rh_pct=last_rh_pct,
+                    tvoc=last_tvoc,
+                    voc_index=last_voc_index,
+                )
         else:
             print(f"SCD40 is not data_ready!")
 

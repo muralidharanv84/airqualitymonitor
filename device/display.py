@@ -49,24 +49,82 @@ _X_16 = [
 ]
 
 
-def init_display(rotation=0, baudrate=12000000):
+def init_display(rotation=0, baudrate=12000000, board_type="auto", display_invert=False):
+    def _try_board_display():
+        if hasattr(board, "DISPLAY") and board.DISPLAY is not None:
+            disp = board.DISPLAY
+            _ = disp.width
+            _ = disp.height
+            try:
+                disp.rotation = rotation
+            except Exception:
+                pass
+            return disp
+        return None
+
+    def _display_from_spi(spi, chip_select, command, reset, invert=False):
+        display_bus = fourwire.FourWire(
+            spi, command=command, chip_select=chip_select, reset=reset, baudrate=baudrate
+        )
+        try:
+            return ILI9341(
+                display_bus,
+                width=240, height=320,
+                rotation=rotation,
+                invert=invert,
+            )
+        except TypeError:
+            disp = ILI9341(
+                display_bus,
+                width=240, height=320,
+                rotation=rotation,
+            )
+            if invert:
+                try:
+                    disp.invert = True
+                except Exception:
+                    pass
+            return disp
+
     displayio.release_displays()
 
-    spi = busio.SPI(clock=board.D36, MOSI=board.D35, MISO=board.D37)
+    if board_type == "auto":
+        try:
+            disp = _try_board_display()
+            if disp is not None:
+                return disp
+        except Exception:
+            pass
+        if hasattr(board, "LCD_CS") and hasattr(board, "LCD_DC"):
+            spi = busio.SPI(clock=board.LCD_SCK, MOSI=board.LCD_MOSI, MISO=board.LCD_MISO)
+            tft_cs = board.LCD_CS
+            tft_dc = board.LCD_DC
+            tft_rst = board.LCD_RST if hasattr(board, "LCD_RST") else None
+            return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
+        if hasattr(board, "TFT_CS") and hasattr(board, "TFT_DC"):
+            spi = board.SPI()
+            tft_cs = board.TFT_CS
+            tft_dc = board.TFT_DC
+            tft_rst = board.TFT_RST if hasattr(board, "TFT_RST") else None
+            return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
+        spi = busio.SPI(clock=board.D36, MOSI=board.D35, MISO=board.D37)
+        return _display_from_spi(spi, board.D5, board.D6, board.D7, invert=display_invert)
 
-    tft_cs = board.D5
-    tft_dc = board.D6
-    tft_rst = board.D7
+    if board_type == "waveshare_s3_lcd_28":
+        spi = busio.SPI(clock=board.LCD_SCK, MOSI=board.LCD_MOSI, MISO=board.LCD_MISO)
+        tft_cs = board.LCD_CS
+        tft_dc = board.LCD_DC
+        tft_rst = board.LCD_RST if hasattr(board, "LCD_RST") else None
+        return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
 
-    display_bus = fourwire.FourWire(
-        spi, command=tft_dc, chip_select=tft_cs, reset=tft_rst, baudrate=baudrate
-    )
+    if board_type == "tinys3":
+        spi = busio.SPI(clock=board.D36, MOSI=board.D35, MISO=board.D37)
+        return _display_from_spi(spi, board.D5, board.D6, board.D7, invert=display_invert)
 
-    disp = ILI9341(
-        display_bus,
-        width=240, height=320,
-        rotation=rotation)
-    return disp
+    disp = _try_board_display()
+    if disp is not None:
+        return disp
+    return None
 
 
 def hello_world(disp):
@@ -340,6 +398,13 @@ def _make_label(text, color, scale, anchor_point, anchored_position):
     return lbl
 
 
+def _make_solid_background(width, height, color=0x000000):
+    bmp = displayio.Bitmap(width, height, 1)
+    pal = displayio.Palette(1)
+    pal[0] = color
+    return displayio.TileGrid(bmp, pixel_shader=pal)
+
+
 def _column_centers(count, display_width):
     if count <= 0:
         return ()
@@ -364,6 +429,7 @@ def make_dashboard(
     enabled_temp_rh=True,
 ):
     group = displayio.Group()
+    group.append(_make_solid_background(display_width, display_height, color=0x000000))
 
     margin = 6
     icon_gap = 6
@@ -444,20 +510,26 @@ def make_dashboard(
     return group, labels, wifi_icon, battery_icon
 
 
-def update_dashboard(labels, pm25, aqi, co2_ppm=None, temp_c=None, rh_pct=None, tvoc=None, voc_index=None):
-    color, desc = utils.get_classification_from_aqi(int(aqi))
+def update_dashboard(labels, pm25=None, aqi=None, co2_ppm=None, temp_c=None, rh_pct=None, tvoc=None, voc_index=None):
+    color = None
+    if aqi is not None:
+        color, desc = utils.get_classification_from_aqi(int(aqi))
+        labels["aqi_title"].color = color
+        labels["aqi_value"].text = f"{int(aqi)}"
+        labels["aqi_value"].color = color
+        labels["aqi_desc"].text = desc
+        labels["aqi_desc"].color = color
 
-    labels["aqi_title"].color = color
-    labels["aqi_value"].text = f"{int(aqi)}"
-    labels["aqi_value"].color = color
-    labels["aqi_desc"].text = desc
-    labels["aqi_desc"].color = color
-
-    if "pm25_label" in labels:
-        labels["pm25_label"].color = color
+    if "pm25_label" in labels and pm25 is not None:
         labels["pm25_value"].text = f"{pm25:.0f}"
-        labels["pm25_value"].color = color
-        labels["pm25_unit"].color = color
+        if color is None:
+            labels["pm25_label"].color = 0xFFFFFF
+            labels["pm25_value"].color = 0xFFFFFF
+            labels["pm25_unit"].color = 0xFFFFFF
+        else:
+            labels["pm25_label"].color = color
+            labels["pm25_value"].color = color
+            labels["pm25_unit"].color = color
 
     if co2_ppm is not None and "co2_label" in labels:
         co2_color, _ = utils.get_classification_from_co2(int(round(co2_ppm)))

@@ -1,8 +1,6 @@
 import time, gc, os
-import neopixel
 import board, digitalio
 import busio, struct
-import tinys3
 
 START_STOP = 0x7E
 ESC = 0x7D
