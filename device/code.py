@@ -56,7 +56,11 @@ if enable_pixel_wheel:
     pixel_wheel.power_up()
 
 if enable_sps30:
-    sps30_uart.wake_up()
+    try:
+        sps30_uart.wake_up()
+    except Exception as exc:
+        print(f"SPS30 init failed; disabling SPS30: {exc}")
+        enable_sps30 = False
 
 disp = None
 dashboard_labels = None
@@ -113,6 +117,7 @@ SCD40_EVERY_S = 5.0
 SCD40_FIRST_DELAY_S = 10.0
 PIXEL_EVERY_S = 5.0
 LOOP_SLEEP_S = 0.05
+TIME_SYNC_EVERY_S = 6 * 60 * 60
 
 next_pm = 0.0
 next_sht4x = 0.0
@@ -129,6 +134,7 @@ last_temp_c = None
 last_rh_pct = None
 last_tvoc = None
 last_voc_index = None
+sps30_failures = 0
 
 # ---------- I2C sensors ----------
 def init_i2c(board_type):
@@ -189,12 +195,13 @@ while True:
         if st == networking.NetState.OK and net.requests:
             tm.tick(net.requests, now=now)
 
-        if net.is_connected() and not time_synced and now >= next_time_sync:
+        if net.is_connected() and now >= next_time_sync:
             try:
                 net.sync_time()
                 time_synced = True
                 if enable_display and time_label:
                     display.update_time_label(time_label)
+                next_time_sync = now + TIME_SYNC_EVERY_S
             except Exception as e:
                 print(f"Time sync failed: {e}")
                 next_time_sync = now + 30.0
@@ -212,17 +219,25 @@ while True:
     if enable_sps30 and now >= next_pm:
         next_pm = now + PM_EVERY_S
 
-        pm1, pm25, pm4, pm10 = sps30_uart.read_pm()
-        aqi_us = utils.aqi_us_from_pm25(pm25)
-        print(f"PM2.5={pm25:.1f} AQI_US={aqi_us} PM1={pm1:.1f} PM4={pm4:.1f} PM10={pm10:.1f}")
-        last_pm25 = pm25
-        last_aqi_us = aqi_us
-        now = time.monotonic()
-        tm.update_metric("pm25_ugm3", float(pm25), ts=now)
-        tm.update_metric("aqi_us", int(aqi_us), ts=now)
+        try:
+            pm1, pm25, pm4, pm10 = sps30_uart.read_pm()
+            aqi_us = utils.aqi_us_from_pm25(pm25)
+            print(f"PM2.5={pm25:.1f} AQI_US={aqi_us} PM1={pm1:.1f} PM4={pm4:.1f} PM10={pm10:.1f}")
+            last_pm25 = pm25
+            last_aqi_us = aqi_us
+            now = time.monotonic()
+            tm.update_metric("pm25_ugm3", float(pm25), ts=now)
+            tm.update_metric("aqi_us", int(aqi_us), ts=now)
 
-        if enable_display and dashboard_labels:
-            display.update_dashboard(dashboard_labels, pm25, aqi_us, co2_ppm=last_co2_ppm)
+            if enable_display and dashboard_labels:
+                display.update_dashboard(dashboard_labels, pm25, aqi_us, co2_ppm=last_co2_ppm)
+            sps30_failures = 0
+        except Exception as exc:
+            sps30_failures += 1
+            print(f"SPS30 read failed ({sps30_failures}): {exc}")
+            if sps30_failures >= 5:
+                print("Disabling SPS30 after repeated failures.")
+                enable_sps30 = False
 
     # --- SHT4x read + serial log (scheduled) ---
     if enable_sht4x and sht4x and now >= next_sht4x:
