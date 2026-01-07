@@ -6,3 +6,10 @@ Red: Pin 2 (RX) ->      TX
 White: Pin 3 (TX) ->    RX
 Yellow: Pin 4 (SEL) ->  Not connected / floating
 Orange: Pin 5 (GND) ->  GND
+
+SPS30 -> Waveshare
+Black: Pin 1 (VDD)  ->  VBus (Red)
+Red: Pin 2 (RX) ->      TXD (Green)
+White: Pin 3 (TX) ->    RXD (Blue)
+Yellow: Pin 4 (SEL) ->  Not connected / floating
+Orange: Pin 5 (GND) ->  GND (Black)

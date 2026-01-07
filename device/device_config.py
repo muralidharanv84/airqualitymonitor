@@ -27,7 +27,7 @@ DEVICE_CONFIGS = {
         "board_type": "waveshare_s3_lcd_28",
         "display_invert": True,
         "enable_pixel_wheel": False,
-        "enable_sps30": False,
+        "enable_sps30": True,
         "enable_display": True,
         "enable_wifi": True,
         "enable_sht4x": False,
