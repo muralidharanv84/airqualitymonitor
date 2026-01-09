@@ -5,10 +5,13 @@ import displayio
 import fourwire
 import terminalio
 import utils
+import pwmio
+import digitalio
 from adafruit_display_text import label
 from adafruit_ili9341 import ILI9341
 
 # -------- WiFi icon widget (top-right) --------
+_backlight = None
 
 _WIFI_16 = [
     "0000000000000000",
@@ -50,6 +53,23 @@ _X_16 = [
 
 
 def init_display(rotation=0, baudrate=12000000, board_type="auto", display_invert=False):
+    def _set_backlight_max():
+        global _backlight
+        if _backlight is not None:
+            return
+        if not hasattr(board, "LCD_BL"):
+            return
+        try:
+            _backlight = pwmio.PWMOut(board.LCD_BL, frequency=1000, duty_cycle=65535)
+        except Exception:
+            try:
+                _backlight = digitalio.DigitalInOut(board.LCD_BL)
+                _backlight.switch_to_output(value=True)
+            except Exception:
+                _backlight = None
+
+    _set_backlight_max()
+
     def _spi_from_lcd_pins(retries=2, delay_s=0.2):
         for attempt in range(retries):
             try:

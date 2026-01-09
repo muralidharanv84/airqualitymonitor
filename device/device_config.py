@@ -1,6 +1,7 @@
 DEFAULT_CONFIG = {
     "board_type": "tinys3",
     "display_invert": False,
+    "display_rotation": 0,
     "enable_pixel_wheel": True,
     "enable_sps30": True,
     "enable_display": True,
@@ -15,6 +16,7 @@ DEVICE_CONFIGS = {
     "murali-1": {
         "board_type": "tinys3",
         "display_invert": False,
+        "display_rotation": 0,
         "enable_pixel_wheel": True,
         "enable_sps30": True,
         "enable_display": True,
@@ -26,6 +28,7 @@ DEVICE_CONFIGS = {
    "murali-living-room": {
         "board_type": "waveshare_s3_lcd_28",
         "display_invert": True,
+        "display_rotation": 180,
         "enable_pixel_wheel": False,
         "enable_sps30": True,
         "enable_display": True,

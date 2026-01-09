@@ -27,6 +27,7 @@ enable_sgp40 = device_cfg["enable_sgp40"]
 enable_scd40 = device_cfg["enable_scd40"]
 board_type = device_cfg["board_type"]
 display_invert = device_cfg["display_invert"]
+display_rotation = device_cfg["display_rotation"]
 
 if enable_pixel_wheel:
     import neopixel
@@ -74,7 +75,11 @@ def init_display_if_needed(now=None):
         return
     if now is not None and now < next_display_init:
         return
-    disp = display.init_display(board_type=board_type, display_invert=display_invert)
+    disp = display.init_display(
+        board_type=board_type,
+        display_invert=display_invert,
+        rotation=display_rotation,
+    )
     if disp is None or not hasattr(disp, "width") or disp.width is None:
         print("Display init failed; will retry.")
         disp = None
