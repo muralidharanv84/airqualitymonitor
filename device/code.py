@@ -68,27 +68,36 @@ wifi_icon = None
 battery_icon = None
 time_label = None
 
-if enable_display:
+def init_display_if_needed(now=None):
+    global disp, dashboard_labels, wifi_icon, battery_icon, time_label, next_display_init
+    if not enable_display or disp is not None:
+        return
+    if now is not None and now < next_display_init:
+        return
     disp = display.init_display(board_type=board_type, display_invert=display_invert)
     if disp is None or not hasattr(disp, "width") or disp.width is None:
-        print("Display init failed; disabling display output.")
-        enable_display = False
-    else:
-        group, dashboard_labels, wifi_icon, battery_icon = display.make_dashboard(
-            display_width=disp.width,
-            display_height=disp.height,
-            enabled_sps30=enable_sps30,
-            enabled_scd40=enable_scd40,
-            enabled_sgp40=enable_sgp40,
-            enabled_temp_rh=(enable_sht4x or enable_scd40),
-        )
-        disp.root_group = group
+        print("Display init failed; will retry.")
+        disp = None
+        next_display_init = (now or time.monotonic()) + DISPLAY_RETRY_EVERY_S
+        return
+    group, dashboard_labels, wifi_icon, battery_icon = display.make_dashboard(
+        display_width=disp.width,
+        display_height=disp.height,
+        enabled_sps30=enable_sps30,
+        enabled_scd40=enable_scd40,
+        enabled_sgp40=enable_sgp40,
+        enabled_temp_rh=(enable_sht4x or enable_scd40),
+    )
+    disp.root_group = group
 
-        wifi_icon.set_state(display.WifiIcon.INIT)
-        battery_icon.set_state(display.BatteryIcon.CHARGING)
-        time_label = display.add_time_label_to_group(
-            group, display_width=disp.width, display_height=disp.height, scale=1
-        )
+    wifi_icon.set_state(display.WifiIcon.INIT)
+    battery_icon.set_state(display.BatteryIcon.CHARGING)
+    time_label = display.add_time_label_to_group(
+        group, display_width=disp.width, display_height=disp.height, scale=1
+    )
+
+if enable_display:
+    init_display_if_needed()
 
 # Network manager
 net = networking.NetworkManager(healthcheck_every_s=30.0, wifi_retry_s=5.0, debug=True) if enable_wifi else None
@@ -118,6 +127,9 @@ SCD40_FIRST_DELAY_S = 10.0
 PIXEL_EVERY_S = 5.0
 LOOP_SLEEP_S = 0.05
 TIME_SYNC_EVERY_S = 6 * 60 * 60
+SPS30_FAILURE_RESET_S = 30 * 60
+SPS30_MAX_FAILURES = 4
+DISPLAY_RETRY_EVERY_S = 2.0
 
 next_pm = 0.0
 next_sht4x = 0.0
@@ -127,6 +139,7 @@ next_pixel = 0.0
 next_time = 0.0
 time_synced = False
 next_time_sync = 0.0
+next_display_init = 0.0
 last_pm25 = None
 last_aqi_us = None
 last_co2_ppm = None
@@ -135,6 +148,7 @@ last_rh_pct = None
 last_tvoc = None
 last_voc_index = None
 sps30_failures = 0
+last_sps30_failure_ts = None
 
 # ---------- I2C sensors ----------
 def init_i2c(board_type):
@@ -174,6 +188,7 @@ while True:
     now = time.monotonic()
 
     # keep blink animation responsive
+    init_display_if_needed(now)
     if enable_display and wifi_icon:
         wifi_icon.tick(now, period=0.5)
 
@@ -232,10 +247,18 @@ while True:
             if enable_display and dashboard_labels:
                 display.update_dashboard(dashboard_labels, pm25, aqi_us, co2_ppm=last_co2_ppm)
             sps30_failures = 0
+            last_sps30_failure_ts = None
         except Exception as exc:
+            if last_sps30_failure_ts is not None and (now - last_sps30_failure_ts) >= SPS30_FAILURE_RESET_S:
+                sps30_failures = 0
             sps30_failures += 1
+            last_sps30_failure_ts = now
             print(f"SPS30 read failed ({sps30_failures}): {exc}")
-            if sps30_failures >= 5:
+            last_pm25 = None
+            last_aqi_us = None
+            if enable_display and dashboard_labels:
+                display.update_dashboard(dashboard_labels, pm25=None, aqi=None, co2_ppm=last_co2_ppm)
+            if sps30_failures >= SPS30_MAX_FAILURES:
                 print("Disabling SPS30 after repeated failures.")
                 enable_sps30 = False
 

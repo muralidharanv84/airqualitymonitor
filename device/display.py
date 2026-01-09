@@ -50,6 +50,20 @@ _X_16 = [
 
 
 def init_display(rotation=0, baudrate=12000000, board_type="auto", display_invert=False):
+    def _spi_from_lcd_pins(retries=2, delay_s=0.2):
+        for attempt in range(retries):
+            try:
+                return busio.SPI(clock=board.LCD_SCK, MOSI=board.LCD_MOSI, MISO=board.LCD_MISO)
+            except ValueError as exc:
+                if "in use" not in str(exc).lower() or attempt >= retries - 1:
+                    raise
+                try:
+                    displayio.release_displays()
+                except Exception:
+                    pass
+                time.sleep(delay_s)
+        return None
+
     def _try_board_display():
         if hasattr(board, "DISPLAY") and board.DISPLAY is not None:
             disp = board.DISPLAY
@@ -96,11 +110,15 @@ def init_display(rotation=0, baudrate=12000000, board_type="auto", display_inver
         except Exception:
             pass
         if hasattr(board, "LCD_CS") and hasattr(board, "LCD_DC"):
-            spi = busio.SPI(clock=board.LCD_SCK, MOSI=board.LCD_MOSI, MISO=board.LCD_MISO)
-            tft_cs = board.LCD_CS
-            tft_dc = board.LCD_DC
-            tft_rst = board.LCD_RST if hasattr(board, "LCD_RST") else None
-            return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
+            try:
+                time.sleep(0.2)
+                spi = _spi_from_lcd_pins()
+                tft_cs = board.LCD_CS
+                tft_dc = board.LCD_DC
+                tft_rst = board.LCD_RST if hasattr(board, "LCD_RST") else None
+                return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
+            except Exception:
+                return None
         if hasattr(board, "TFT_CS") and hasattr(board, "TFT_DC"):
             spi = board.SPI()
             tft_cs = board.TFT_CS
@@ -111,11 +129,15 @@ def init_display(rotation=0, baudrate=12000000, board_type="auto", display_inver
         return _display_from_spi(spi, board.D5, board.D6, board.D7, invert=display_invert)
 
     if board_type == "waveshare_s3_lcd_28":
-        spi = busio.SPI(clock=board.LCD_SCK, MOSI=board.LCD_MOSI, MISO=board.LCD_MISO)
-        tft_cs = board.LCD_CS
-        tft_dc = board.LCD_DC
-        tft_rst = board.LCD_RST if hasattr(board, "LCD_RST") else None
-        return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
+        try:
+            time.sleep(5)
+            spi = _spi_from_lcd_pins()
+            tft_cs = board.LCD_CS
+            tft_dc = board.LCD_DC
+            tft_rst = board.LCD_RST if hasattr(board, "LCD_RST") else None
+            return _display_from_spi(spi, tft_cs, tft_dc, tft_rst, invert=display_invert)
+        except Exception:
+            return None
 
     if board_type == "tinys3":
         spi = busio.SPI(clock=board.D36, MOSI=board.D35, MISO=board.D37)
@@ -519,17 +541,29 @@ def update_dashboard(labels, pm25=None, aqi=None, co2_ppm=None, temp_c=None, rh_
         labels["aqi_value"].color = color
         labels["aqi_desc"].text = desc
         labels["aqi_desc"].color = color
+    else:
+        labels["aqi_title"].color = 0xFFFFFF
+        labels["aqi_value"].text = "--"
+        labels["aqi_value"].color = 0xFFFFFF
+        labels["aqi_desc"].text = " "
+        labels["aqi_desc"].color = 0xFFFFFF
 
-    if "pm25_label" in labels and pm25 is not None:
-        labels["pm25_value"].text = f"{pm25:.0f}"
-        if color is None:
+    if "pm25_label" in labels:
+        if pm25 is None:
+            labels["pm25_value"].text = "--"
             labels["pm25_label"].color = 0xFFFFFF
             labels["pm25_value"].color = 0xFFFFFF
             labels["pm25_unit"].color = 0xFFFFFF
         else:
-            labels["pm25_label"].color = color
-            labels["pm25_value"].color = color
-            labels["pm25_unit"].color = color
+            labels["pm25_value"].text = f"{pm25:.0f}"
+            if color is None:
+                labels["pm25_label"].color = 0xFFFFFF
+                labels["pm25_value"].color = 0xFFFFFF
+                labels["pm25_unit"].color = 0xFFFFFF
+            else:
+                labels["pm25_label"].color = color
+                labels["pm25_value"].color = color
+                labels["pm25_unit"].color = color
 
     if co2_ppm is not None and "co2_label" in labels:
         co2_color, _ = utils.get_classification_from_co2(int(round(co2_ppm)))
