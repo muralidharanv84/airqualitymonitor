@@ -37,18 +37,17 @@ Source: `docs/Waveshare ESP32-S3 Touch LCD 2.8 2D diagram.png`
 ### SPS40 dev board (provided)
 - Overall board size: **55 mm × 17 mm × 10 mm** (height includes top of sensor).
 
-## Step 1 in progress: remaining data to collect
-- SPS30 inlet/outlet positions, mounting hole spacing, and any keepout zones (ideally from the mechanical design guide).
-- SPS30 mounting strategy confirmation (screws vs. posts vs. adhesive pads).
-- Preferred PCB standoff height for the ESP32 board (screw size will match the display dev board).
-
 ## Assembly + placement notes (from latest input)
 - SPS40 dev board can be taped or glued to the sensor enclosure side wall.
 - Battery size: **51 mm × 40 mm × 10 mm**, connector on top.
 - Use the same screw size as the display dev board for standoffs and enclosure assembly.
 - Prefer a slide-in/slide-out rear wall for the sensor enclosure (no screws) to improve serviceability.
 
-## Questions
-1. Do you have the SPS30 mechanical design guide (or measurements) for inlet/outlet locations and mounting hole spacing?
-2. Should we prioritize adhesive mounting for SPS30 as well, or keep it screw/post-mounted?
-3. Any preference on the slide-in rear wall approach (e.g., friction fit, tabs + detents, or a keyed track)?
+## User answers and decisions
+- SPS30 placement guide reference: use the attached Sensirion placement guide image; keep the rear slide-in wall solid for now (no vent slots) and add venting to that lid as the final step.
+- SPS30 mounting: adhesive mounting (no screw holes on the module).
+- Slide-in rear wall approach: I will proceed with a keyed rail + detent approach that slides in from the rear, with a small pull notch for removal.
+
+## Step 1 remaining data to collect
+- SPS30 inlet/outlet positions and keepout zones (placement guide confirms orientation, but detailed offsets are still needed for precise vent alignment later).
+- Preferred PCB standoff height once screw size is confirmed on the display dev board.
