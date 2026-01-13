@@ -20,6 +20,17 @@ The enclosure is a 3-part assembly:
 - Central recess on rear grille: rounded-rectangle inset with a USB-C opening centered.
 - Underside: 4 round feet, slightly inset from the corners.
 
+This is the crude ascii art version of the expected side profile of the air quality monitor when it's complete
+                   ___
+                  /  /
+                 /  /
+                /  /
+               /  /
+              /  /
+             /  ------------|
+            /               |
+           / _______________|
+
 Note: Colors and surface finish in the reference are matte with soft shadows; the model should prioritize geometry and proportions.
 
 ## Critical dimensions (from assets and notes)
