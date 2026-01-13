@@ -1,4 +1,4 @@
-# Step 2 - Global parameters (Fusion 360)
+# Step 2 - Global parameters (OpenSCAD)
 
 ## Scope
 Define the initial parameter set for the enclosure so the model stays fully parametric. Values below are the starting point; any TBD values should be confirmed before cutting hard geometry.
@@ -51,18 +51,27 @@ Define the initial parameter set for the enclosure so the model stays fully para
 | `sps30_body_d` | 12.0 | SPS30 body depth. |
 | `sps30_adhesive_thk` | 0.5 | Foam tape or adhesive pad thickness. |
 | `sps30_mount_clear` | 0.6 | Clearance around SPS30 body. |
-| `sps40_board_w` | 55.0 | SPS40 dev board width. |
-| `sps40_board_h` | 17.0 | SPS40 dev board height. |
-| `sps40_board_d` | 10.0 | SPS40 dev board depth. |
-| `sps40_mount_clear` | 0.6 | Clearance around SPS40 board. |
+| `scd40_board_w` | TBD | SCD40 board width (measure). |
+| `scd40_board_h` | TBD | SCD40 board height (measure). |
+| `scd40_board_d` | TBD | SCD40 board depth (measure). |
+| `scd40_mount_clear` | 0.6 | Clearance around SCD40 board. |
 | `batt_w` | 51.0 | Battery width. |
 | `batt_h` | 40.0 | Battery height. |
 | `batt_d` | 10.0 | Battery depth. |
 | `batt_clear` | 0.6 | Clearance in battery tray. |
-| `front_vent_slot_w` | 18.0 | Initial front intake slot width (tunable). |
-| `front_vent_slot_h` | 2.0 | Initial front intake slot height (tunable). |
-| `front_vent_slot_gap` | 1.5 | Gap between intake slots (tunable). |
-| `front_vent_slot_count` | 3 | Number of intake slots (tunable). |
+| `front_vent_slot_w` | 18.0 | Display bottom vent slot width (tunable). |
+| `front_vent_slot_h` | 2.0 | Display bottom vent slot height (tunable). |
+| `front_vent_slot_gap` | 1.5 | Gap between display vent slots (tunable). |
+| `front_vent_slot_count` | 3 | Number of display vent slots (tunable). |
+| `sensor_vent_slot_w` | 18.0 | Sensor chamber bottom vent width (tunable). |
+| `sensor_vent_slot_h` | 2.0 | Sensor chamber bottom vent height (tunable). |
+| `sensor_vent_slot_gap` | 2.0 | Gap between sensor vents (tunable). |
+| `sensor_vent_slot_count` | 2 | Two vents at the sensor chamber bottom. |
+| `display_lid_vent_slot_w` | 18.0 | Display rear cover top vent width (tunable). |
+| `display_lid_vent_slot_h` | 2.0 | Display rear cover top vent height (tunable). |
+| `display_lid_vent_slot_count` | 1 | Number of display cover vents. |
+| `usb_c_open_w` | 9.0 | USB-C opening width on the sensor door (tunable). |
+| `usb_c_open_h` | 4.0 | USB-C opening height on the sensor door (tunable). |
 | `rear_slide_clear` | 0.30 | Clearance for slide-in rear wall in rails. |
 | `rear_rail_thk` | 1.6 | Rail thickness for the slide-in rear wall. |
 | `rear_detent_h` | 0.6 | Detent height to retain the slide-in wall. |
@@ -70,10 +79,11 @@ Define the initial parameter set for the enclosure so the model stays fully para
 | `rear_notch_h` | 3.0 | Pull notch height for removal. |
 
 ## Notes
-- SPS30 orientation: keep the green Sensirion face down (ground-facing) per the placement guide. Rear slide-in wall stays solid for now; vent slots will be added as the final step.
+- SPS30 orientation: keep the green Sensirion face down (ground-facing) per the placement guide. The sensor door stays solid for now; vent slots will be added after fit is validated.
 - Adhesive mounting is assumed for SPS30; model a flat mounting shelf sized to `sps30_body_*` with `sps30_adhesive_thk` allowance.
 - Waveshare wiki "Dimensions" confirms **73.06 × 50.54 mm** overall; no additional offsets beyond the 2D diagram were provided.
+- SCD40 board dimensions are still TBD; update `scd40_board_*` after measuring the actual board.
 
 ## Step 2 completion check
-- Parameter table added to Fusion 360 with the names above.
-- Placeholder sketches reference `front_shell_*`, `window_*`, and `pcb_*` dimensions to confirm updates flow through the timeline.
+- Parameter block will live in the top of the OpenSCAD files (or a shared include) with the names above.
+- Placeholder primitives should reference `front_shell_*`, `window_*`, and `pcb_*` so parameter updates propagate.

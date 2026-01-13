@@ -2,7 +2,7 @@
 
 ## What I built
 - A parametric OpenSCAD front shell model with rounded corners, a display window cutout, three right-side button access holes (side press), and lower intake vent slots.
-- Exported STL for Fusion 360 import and two PNG renders for visual inspection.
+- Exported STL and PNG renders for visual inspection.
 
 ## Files
 - OpenSCAD source: `cad/air-quality-monitor-front-shell.scad`
@@ -20,11 +20,15 @@
 ## Assumptions / placeholders (needs confirmation)
 - Button offsets now use the diagram values (7.84 mm top offset from board edge, 7.82 mm pitch); horizontal offset assumes the board is centered behind the touch panel and the button center is on the board edge.
 - Front shell depth `front_shell_d = 18 mm` is a starting value only; needs adjustment after standoff height and internal clearance are finalized.
-- No front tilt, chamfers, or display recess lip yet; those will be refined once the Fusion model is established.
+- No front tilt or display recess lip yet; these need to be added for the angled housing and rear-install board design.
 
-## How to load in Fusion 360
-- Import the STL `cad/air-quality-monitor-front-shell.stl`.
-- Use **Mesh > Convert Mesh** if you want BRep editing.
+## Update for revised requirements
+- Fuse the front display housing with the rear sensor cabinet into a single main body.
+- Move the display vent to the bottom of the display area on the main body.
+- Add two sensor chamber bottom vents in the main body.
+- Keep the right-side button holes aligned, but ensure the board installs from the rear.
+## How to preview
+- Open `cad/air-quality-monitor-front-shell.scad` in OpenSCAD and render (F6) or export via CLI for snapshots.
 
 ## Step 3 completion check
 - Front shell geometry is now modeled and viewable.

@@ -20,8 +20,14 @@
 
 ## Assumptions / placeholders (needs confirmation)
 - Slide-in rear wall rails and detents are deferred to Step 7 (assembly features).
-- Sensor mounting shelves and final chamber sizing will be refined after test fitting SPS30/SPS40.
+- Sensor mounting shelves and final chamber sizing will be refined after test fitting SPS30/SCD40.
 - Vent slots are intentionally deferred to the final step.
+
+## Update for revised requirements
+- Fuse the front display housing and rear sensor cabinet into a single main body.
+- Split the rear into two components: display rear cover and sensor slide-in door.
+- Add a USB-C opening to the sensor door (vents later).
+- Add two bottom vents on the main body for the sensor chamber.
 
 ## Step 5 completion check
 - Rear shell aligns in outer size with the front shell.

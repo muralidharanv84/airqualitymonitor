@@ -3,7 +3,7 @@
 ## Plan review (quick sanity)
 - The plan is well-structured: parameter-driven modeling, separate components, and render checkpoints per step are appropriate for a print-ready enclosure.
 - Step order makes sense (collect dimensions first, then parameters, then shells and internals).
-- I can proceed with Step 1 by extracting the LCD board dimensions from the provided 2D diagram and flagging the remaining measurements needed for SPS30/SPS40 and the battery.
+- I can proceed with Step 1 by extracting the LCD board dimensions from the provided 2D diagram and flagging the remaining measurements needed for SPS30/SCD40, the USB-C extension port, and the battery.
 
 ## Measurements extracted from provided assets
 Source: `docs/Waveshare ESP32-S3 Touch LCD 2.8 2D diagram.png`
@@ -34,14 +34,15 @@ Source: `docs/Waveshare ESP32-S3 Touch LCD 2.8 2D diagram.png`
 ### SPS30 sensor module (internet reference)
 - Overall body size: **~41 mm × 41 mm × 12 mm** (SparkFun SPS30 product page notes “just under 41mm x 41mm x 12mm”). Source: https://www.sparkfun.com/particulate-matter-sensor-sps30.html
 
-### SPS40 dev board (provided)
-- Overall board size: **55 mm × 17 mm × 10 mm** (height includes top of sensor).
+### SCD40 board (provided)
+- Overall board size: **TBD** (measure actual board dimensions).
 
 ## Assembly + placement notes (from latest input)
-- SPS40 dev board can be taped or glued to the sensor enclosure side wall.
+- SCD40 board can be taped or glued to the sensor enclosure side wall.
 - Battery size: **51 mm × 40 mm × 10 mm**, connector on top.
 - Use the same screw size as the display dev board for standoffs and enclosure assembly.
 - Prefer a slide-in/slide-out rear wall for the sensor enclosure (no screws) to improve serviceability.
+- USB-C extension port needs a panel opening on the rear slide-in door.
 
 ## User answers and decisions
 - SPS30 placement guide reference: use the attached Sensirion placement guide image; keep the rear slide-in wall solid for now (no vent slots) and add venting to that lid as the final step.
@@ -50,4 +51,6 @@ Source: `docs/Waveshare ESP32-S3 Touch LCD 2.8 2D diagram.png`
 
 ## Step 1 remaining data to collect
 - SPS30 inlet/outlet positions and keepout zones (placement guide confirms orientation, but detailed offsets are still needed for precise vent alignment later).
+- SCD40 board dimensions and keepout zones.
+- USB-C extension female port dimensions (opening size + bezel depth).
 - Preferred PCB standoff height once screw size is confirmed on the display dev board.

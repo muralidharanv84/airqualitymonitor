@@ -20,6 +20,11 @@
 - USB slot position is centered; confirm actual port offset before finalizing the opening.
 - Cable strain relief is represented by the deeper slot only; we can add a more specific channel once the board is test-fit.
 
+## Update for revised requirements
+- Move the display board standoffs to the display rear cover so the board mounts to the lid with M2.5 screws.
+- Replace the bottom USB-C clearance with a rear USB-C opening on the sensor slide-in door (via extension cable).
+- Add a LiPo battery recess and a top vent to the display rear cover.
+
 ## Step 4 completion check
 - Standoffs align with the published mounting hole spacing.
 - USB clearance slot exists at the bottom edge for a downward cable.
