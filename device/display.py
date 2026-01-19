@@ -469,6 +469,7 @@ def make_dashboard(
     enabled_scd40=True,
     enabled_sgp40=True,
     enabled_temp_rh=True,
+    enabled_battery=True,
 ):
     group = displayio.Group()
     group.append(_make_solid_background(display_width, display_height, color=0x000000))
@@ -477,15 +478,21 @@ def make_dashboard(
     icon_gap = 6
     wifi_w = 16
     battery_w = 24
-    battery_x = display_width - margin - battery_w
-    wifi_x = battery_x - icon_gap - wifi_w
+    if enabled_battery:
+        battery_x = display_width - margin - battery_w
+        wifi_x = battery_x - icon_gap - wifi_w
+    else:
+        battery_x = None
+        wifi_x = display_width - margin - wifi_w
     icon_y = margin
 
     wifi_icon = WifiIcon(x=wifi_x, y=icon_y, scale=1)
     group.append(wifi_icon.group)
 
-    battery_icon = BatteryIcon(x=battery_x, y=icon_y + 2, scale=1, color=0xFFFFFF)
-    group.append(battery_icon.group)
+    battery_icon = None
+    if enabled_battery:
+        battery_icon = BatteryIcon(x=battery_x, y=icon_y + 2, scale=1, color=0xFFFFFF)
+        group.append(battery_icon.group)
 
     aqi_title = _make_label(
         "AQI", 0xFFFFFF, 2, (0.5, 0.5), (display_width // 2, 44)

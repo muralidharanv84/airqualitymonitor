@@ -9,6 +9,7 @@ DEFAULT_CONFIG = {
     "enable_sht4x": True,
     "enable_sgp40": True,
     "enable_scd40": True,
+    "enable_battery": True,
 }
 
 DEVICE_CONFIGS = {
@@ -23,7 +24,8 @@ DEVICE_CONFIGS = {
         "enable_wifi": True,
         "enable_sht4x": True,
         "enable_sgp40": True,
-        "enable_scd40": True,
+        "enable_scd40": False,
+        "enable_battery": False,
     },
    "murali-living-room": {
         "board_type": "waveshare_s3_lcd_28",
@@ -36,6 +38,7 @@ DEVICE_CONFIGS = {
         "enable_sht4x": False,
         "enable_sgp40": False,
         "enable_scd40": True,
+        "enable_battery": False,
     },
 }
 

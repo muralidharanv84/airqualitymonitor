@@ -25,6 +25,7 @@ enable_wifi = device_cfg["enable_wifi"]
 enable_sht4x = device_cfg["enable_sht4x"]
 enable_sgp40 = device_cfg["enable_sgp40"]
 enable_scd40 = device_cfg["enable_scd40"]
+enable_battery = device_cfg["enable_battery"]
 board_type = device_cfg["board_type"]
 display_invert = device_cfg["display_invert"]
 display_rotation = device_cfg["display_rotation"]
@@ -92,11 +93,13 @@ def init_display_if_needed(now=None):
         enabled_scd40=enable_scd40,
         enabled_sgp40=enable_sgp40,
         enabled_temp_rh=(enable_sht4x or enable_scd40),
+        enabled_battery=enable_battery,
     )
     disp.root_group = group
 
     wifi_icon.set_state(display.WifiIcon.INIT)
-    battery_icon.set_state(display.BatteryIcon.CHARGING)
+    if enable_battery:
+        battery_icon.set_state(display.BatteryIcon.CHARGING)
     time_label = display.add_time_label_to_group(
         group, display_width=disp.width, display_height=disp.height, scale=1
     )
