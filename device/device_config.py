@@ -9,6 +9,7 @@ DEFAULT_CONFIG = {
     "enable_sht4x": True,
     "enable_sgp40": True,
     "enable_scd40": True,
+    "scd40_altitude_m": 917,
     "enable_battery": True,
 }
 

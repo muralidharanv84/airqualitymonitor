@@ -25,6 +25,7 @@ enable_wifi = device_cfg["enable_wifi"]
 enable_sht4x = device_cfg["enable_sht4x"]
 enable_sgp40 = device_cfg["enable_sgp40"]
 enable_scd40 = device_cfg["enable_scd40"]
+scd40_altitude_m = device_cfg["scd40_altitude_m"]
 enable_battery = device_cfg["enable_battery"]
 board_type = device_cfg["board_type"]
 display_invert = device_cfg["display_invert"]
@@ -187,6 +188,11 @@ if enable_sht4x:
 if enable_sgp40:
     next_sgp40 = time.monotonic() + SGP40_FIRST_DELAY_S
 if enable_scd40 and scd40:
+    try:
+        scd40.altitude = int(scd40_altitude_m)
+        print(f"SCD40 altitude compensation set to {scd40_altitude_m}m")
+    except Exception as exc:
+        print(f"SCD40 altitude compensation failed: {exc}")
     print("Starting periodic measurement for SCD40")
     scd40.start_periodic_measurement()
     next_scd40 = time.monotonic() + SCD40_FIRST_DELAY_S
