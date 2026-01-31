@@ -16,17 +16,20 @@ DEFAULT_CONFIG = {
 DEVICE_CONFIGS = {
     # All currently available sensors enabled.
     "murali-1": {
-        "board_type": "tinys3",
-        "display_invert": False,
-        "display_rotation": 0,
-        "enable_pixel_wheel": True,
+        "board_type": "waveshare_s3_lcd_28",
+        "display_invert": True,
+        "display_rotation": 180,
+        "enable_pixel_wheel": False,
         "enable_sps30": True,
         "enable_display": True,
         "enable_wifi": True,
         "enable_sht4x": True,
         "enable_sgp40": True,
         "enable_scd40": False,
-        "enable_battery": False,
+        "enable_battery": True,
+        "battery_adc_pin": "IO8",
+        "battery_voltage_divider": 3.0,
+        "battery_voltage_offset": 0.990476,
     },
    "murali-living-room": {
         "board_type": "waveshare_s3_lcd_28",

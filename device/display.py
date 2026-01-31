@@ -356,6 +356,25 @@ def _make_battery_bitmap(fill_cols=0, charging=False):
     return bmp
 
 
+def _make_battery_bolt_bitmap():
+    width = 24
+    height = 12
+    bmp = displayio.Bitmap(width, height, 2)
+    bolt = [
+        "001100",
+        "011110",
+        "001100",
+        "011000",
+        "111100",
+        "001100",
+    ]
+    for y, row in enumerate(bolt):
+        for x, ch in enumerate(row):
+            if ch == "1":
+                bmp[8 + x, 3 + y] = 1
+    return bmp
+
+
 class BatteryIcon:
     EMPTY = 0
     QUARTER = 1
@@ -378,17 +397,42 @@ class BatteryIcon:
             BatteryIcon.HALF: _make_battery_bitmap(fill_cols=9),
             BatteryIcon.THREE_QUARTER: _make_battery_bitmap(fill_cols=13),
             BatteryIcon.FULL: _make_battery_bitmap(fill_cols=18),
-            BatteryIcon.CHARGING: _make_battery_bitmap(fill_cols=0, charging=True),
         }
 
         self.tg = displayio.TileGrid(self._bitmaps[BatteryIcon.EMPTY], pixel_shader=self.pal)
         self.group.append(self.tg)
+        self._bolt_tg = displayio.TileGrid(_make_battery_bolt_bitmap(), pixel_shader=self.pal)
+        self._bolt_tg.hidden = True
+        self.group.append(self._bolt_tg)
         self.state = BatteryIcon.EMPTY
 
     def set_state(self, state):
+        self._bolt_tg.hidden = True
+        if state == BatteryIcon.CHARGING:
+            self.state = BatteryIcon.CHARGING
+            self.tg.bitmap = self._bitmaps[BatteryIcon.EMPTY]
+            self._bolt_tg.hidden = False
+            return
         if state in self._bitmaps:
             self.state = state
             self.tg.bitmap = self._bitmaps[state]
+
+    def set_level(self, percent, charging=False):
+        if percent is None:
+            state = BatteryIcon.EMPTY
+        elif percent >= 80:
+            state = BatteryIcon.FULL
+        elif percent >= 60:
+            state = BatteryIcon.THREE_QUARTER
+        elif percent >= 40:
+            state = BatteryIcon.HALF
+        elif percent >= 20:
+            state = BatteryIcon.QUARTER
+        else:
+            state = BatteryIcon.EMPTY
+        self.state = state
+        self.tg.bitmap = self._bitmaps[state]
+        self._bolt_tg.hidden = not charging
 
 
 def add_battery_icon_to_group(
@@ -470,6 +514,7 @@ def make_dashboard(
     enabled_sgp40=True,
     enabled_temp_rh=True,
     enabled_battery=True,
+    show_battery_pct=False,
 ):
     group = displayio.Group()
     group.append(_make_solid_background(display_width, display_height, color=0x000000))
@@ -480,9 +525,16 @@ def make_dashboard(
     battery_w = 24
     if enabled_battery:
         battery_x = display_width - margin - battery_w
-        wifi_x = battery_x - icon_gap - wifi_w
+        if show_battery_pct:
+            battery_text_w = 24
+            battery_text_x = battery_x - icon_gap
+            wifi_x = battery_text_x - battery_text_w - icon_gap - wifi_w
+        else:
+            battery_text_x = None
+            wifi_x = battery_x - icon_gap - wifi_w
     else:
         battery_x = None
+        battery_text_x = None
         wifi_x = display_width - margin - wifi_w
     icon_y = margin
 
@@ -493,6 +545,15 @@ def make_dashboard(
     if enabled_battery:
         battery_icon = BatteryIcon(x=battery_x, y=icon_y + 2, scale=1, color=0xFFFFFF)
         group.append(battery_icon.group)
+        if show_battery_pct and battery_text_x is not None:
+            battery_pct_label = _make_label(
+                "--%", 0xFFFFFF, 1, (1.0, 0.5), (battery_text_x, icon_y + 8)
+            )
+            group.append(battery_pct_label)
+        else:
+            battery_pct_label = None
+    else:
+        battery_pct_label = None
 
     aqi_title = _make_label(
         "AQI", 0xFFFFFF, 2, (0.5, 0.5), (display_width // 2, 44)
@@ -533,6 +594,8 @@ def make_dashboard(
         "aqi_value": aqi_value,
         "aqi_desc": aqi_desc,
     }
+    if battery_pct_label is not None:
+        labels["battery_pct"] = battery_pct_label
 
     for (key, title, unit), x in zip(row1_items, row1_x):
         label_item = _make_label(title, 0xFFFFFF, 1, (0.5, 0.5), (x, row1_label_y))

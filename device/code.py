@@ -30,6 +30,21 @@ enable_battery = device_cfg["enable_battery"]
 board_type = device_cfg["board_type"]
 display_invert = device_cfg["display_invert"]
 display_rotation = device_cfg["display_rotation"]
+show_battery_pct = enable_battery and board_type == "waveshare_s3_lcd_28"
+battery_voltage_min = device_cfg.get("battery_voltage_min", 3.2)
+battery_voltage_max = device_cfg.get("battery_voltage_max", 4.2)
+battery_voltage_divider = device_cfg.get(
+    "battery_voltage_divider",
+    3.0 if board_type == "waveshare_s3_lcd_28" else 1.0,
+)
+battery_voltage_offset = device_cfg.get(
+    "battery_voltage_offset",
+    0.990476 if board_type == "waveshare_s3_lcd_28" else 1.0,
+)
+battery_adc_pin_name = device_cfg.get("battery_adc_pin")
+battery_vbus_pin_name = device_cfg.get("battery_vbus_pin")
+battery_charge_pin_name = device_cfg.get("battery_charge_pin")
+battery_charge_active_low = device_cfg.get("battery_charge_active_low", True)
 
 if enable_pixel_wheel:
     import neopixel
@@ -43,6 +58,112 @@ def voc_index_to_tvoc_ethanol_ppb(voc_index: float) -> float:
 
 def voc_index_to_tvoc_ethanol_ppm(voc_index: float) -> float:
     return voc_index_to_tvoc_ethanol_ppb(voc_index) / 1000.0
+
+def _voltage_to_percent(voltage, vmin, vmax):
+    if voltage is None:
+        return None
+    if voltage <= vmin:
+        return 0
+    if voltage >= vmax:
+        return 100
+    return int(round((voltage - vmin) / (vmax - vmin) * 100))
+
+def _find_board_pin(names):
+    for name in names:
+        if hasattr(board, name):
+            return name, getattr(board, name)
+    return None, None
+
+def _resolve_board_pin(name):
+    if not name:
+        return None
+    if isinstance(name, str):
+        return getattr(board, name) if hasattr(board, name) else None
+    return name
+
+def _init_battery_monitor():
+    if not enable_battery:
+        return None
+    if board_type == "tinys3":
+        try:
+            import tinys3
+        except Exception as exc:
+            print(f"Battery init failed (tinys3): {exc}")
+            return None
+        return {"type": "tinys3", "mod": tinys3}
+    if board_type == "waveshare_s3_lcd_28":
+        try:
+            import analogio
+            import digitalio
+        except Exception as exc:
+            print(f"Battery init failed (adc): {exc}")
+            return None
+        sense_pin = _resolve_board_pin(battery_adc_pin_name)
+        if sense_pin is None:
+            _, sense_pin = _find_board_pin(
+                ("BATTERY", "VBAT", "BAT", "BAT_ADC", "VBAT_SENSE", "IO8", "D8", "GP8")
+            )
+        if sense_pin is None:
+            print("Battery sense pin not found; skipping battery reads.")
+            return None
+        sense = analogio.AnalogIn(sense_pin)
+        vbus_pin = _resolve_board_pin(battery_vbus_pin_name)
+        if vbus_pin is None:
+            _, vbus_pin = _find_board_pin(
+                ("VBUS_SENSE", "VBUS", "USB_VBUS", "VBUS_DETECT", "USB_PRESENT")
+            )
+        vbus = None
+        if vbus_pin is not None:
+            vbus = digitalio.DigitalInOut(vbus_pin)
+            vbus.switch_to_input()
+        charge_pin = _resolve_board_pin(battery_charge_pin_name)
+        if charge_pin is None:
+            _, charge_pin = _find_board_pin(("CHARGE_STATUS", "CHARGE", "CHG", "CHRG", "CHARGE_STAT"))
+        charge = None
+        if charge_pin is not None:
+            charge = digitalio.DigitalInOut(charge_pin)
+            charge.switch_to_input()
+        return {
+            "type": "adc",
+            "sense": sense,
+            "vbus": vbus,
+            "charge": charge,
+            "charge_active_low": battery_charge_active_low,
+            "divider": battery_voltage_divider,
+            "offset": battery_voltage_offset,
+        }
+    return None
+
+def _read_battery_monitor(monitor):
+    if monitor is None:
+        return None, False
+    if monitor["type"] == "tinys3":
+        voltage = monitor["mod"].get_battery_voltage()
+        charging = monitor["mod"].get_vbus_present()
+    else:
+        sense = monitor["sense"]
+        ref = getattr(sense, "reference_voltage", 3.3)
+        voltage = (sense.value / 65535) * ref * monitor["divider"] / monitor["offset"]
+        if monitor["charge"] is not None:
+            charging = not monitor["charge"].value if monitor["charge_active_low"] else monitor["charge"].value
+        elif monitor["vbus"] is not None:
+            charging = monitor["vbus"].value
+        else:
+            charging = False
+    percent = _voltage_to_percent(voltage, battery_voltage_min, battery_voltage_max)
+    return percent, charging
+
+def _update_battery_display():
+    if not enable_display or battery_icon is None:
+        return
+    if last_battery_pct is None:
+        if dashboard_labels and "battery_pct" in dashboard_labels:
+            dashboard_labels["battery_pct"].text = "--%"
+        battery_icon.set_level(0, last_battery_charging)
+        return
+    if dashboard_labels and "battery_pct" in dashboard_labels:
+        dashboard_labels["battery_pct"].text = f"{last_battery_pct}%"
+    battery_icon.set_level(last_battery_pct, last_battery_charging)
 
 # NeoPixel
 pixel = None
@@ -70,6 +191,9 @@ dashboard_labels = None
 wifi_icon = None
 battery_icon = None
 time_label = None
+battery_monitor = _init_battery_monitor()
+last_battery_pct = None
+last_battery_charging = False
 
 def init_display_if_needed(now=None):
     global disp, dashboard_labels, wifi_icon, battery_icon, time_label, next_display_init
@@ -95,12 +219,13 @@ def init_display_if_needed(now=None):
         enabled_sgp40=enable_sgp40,
         enabled_temp_rh=(enable_sht4x or enable_scd40),
         enabled_battery=enable_battery,
+        show_battery_pct=show_battery_pct,
     )
     disp.root_group = group
 
     wifi_icon.set_state(display.WifiIcon.INIT)
-    if enable_battery:
-        battery_icon.set_state(display.BatteryIcon.CHARGING)
+    if enable_battery and battery_icon:
+        _update_battery_display()
     time_label = display.add_time_label_to_group(
         group, display_width=disp.width, display_height=disp.height, scale=1
     )
@@ -139,6 +264,7 @@ TIME_SYNC_EVERY_S = 6 * 60 * 60
 SPS30_FAILURE_RESET_S = 30 * 60
 SPS30_MAX_FAILURES = 4
 DISPLAY_RETRY_EVERY_S = 2.0
+BATTERY_EVERY_S = 60.0
 
 next_pm = 0.0
 next_sht4x = 0.0
@@ -149,6 +275,7 @@ next_time = 0.0
 time_synced = False
 next_time_sync = 0.0
 next_display_init = 0.0
+next_battery = 0.0
 last_pm25 = None
 last_aqi_us = None
 last_co2_ppm = None
@@ -348,6 +475,15 @@ while True:
                 )
         else:
             print(f"SCD40 is not data_ready!")
+
+    # --- Battery read + display update (scheduled) ---
+    if enable_battery and battery_monitor and now >= next_battery:
+        next_battery = now + BATTERY_EVERY_S
+        try:
+            last_battery_pct, last_battery_charging = _read_battery_monitor(battery_monitor)
+            _update_battery_display()
+        except Exception as exc:
+            print(f"Battery read failed: {exc}")
 
     if enable_display and time_label and now >= next_time:
         next_time = now + 1.0
